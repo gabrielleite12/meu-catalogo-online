@@ -5,7 +5,7 @@ Next.js 15 + Supabase (login e banco) + Google Drive (fotos) + Vercel. As fotos 
 ## Configuração (uma vez)
 
 1. **Supabase**: crie o projeto e rode `supabase/migrations/001_init.sql` no SQL Editor.
-2. **Google Cloud**: crie um OAuth Client (Web). Ative a *Google Drive API*. Em *Authorized redirect URIs* coloque `https://<projeto>.supabase.co/auth/v1/callback`. Tela de consentimento: adicione o escopo `drive.readonly`.
+2. **Google Cloud**: crie um OAuth Client (Web). Ative a *Google Drive API*. Em *Authorized redirect URIs* coloque `https://iqwfhendcawwilbojqwz.supabase.co/auth/v1/callback`. Tela de consentimento: adicione o escopo `drive.readonly`.
 3. **Supabase → Authentication → Providers → Google**: cole Client ID e Secret. Em *URL Configuration*, adicione `http://localhost:3000/**` e o domínio da Vercel em Redirect URLs.
 4. Copie `.env.example` para `.env.local` e preencha.
 5. `npm install && npm run dev`
