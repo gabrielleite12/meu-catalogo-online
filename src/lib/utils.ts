@@ -9,10 +9,17 @@ export const imgUrl = (fileId: string) => `/api/img/${fileId}`;
 export type Store = {
   id: string; owner_id: string; slug: string; name: string; description: string | null;
   category: string | null; whatsapp: string | null; city: string | null;
-  payment_methods: string[]; delivery_methods: string[]; drive_folder_id: string | null; published: boolean;
+  payment_methods: string[]; delivery_methods: string[]; published: boolean; logo_url: string | null;
 };
 export type Product = {
   id: string; store_id: string; name: string; description: string | null; price: number | null;
   track_stock: boolean; stock: number | null; active: boolean; position: number;
   product_images: { id: string; drive_file_id: string; position: number }[];
 };
+
+/** Só aceita caminhos internos para evitar redirecionamento aberto. */
+export const safeNext = (n: string | null | undefined, fallback = "/") =>
+  n && n.startsWith("/") && !n.startsWith("//") ? n : fallback;
+
+export type Rating = { avg_rating: number; total: number };
+export type Review = { id: string; reviewer_name: string; rating: number; comment: string | null; created_at: string };

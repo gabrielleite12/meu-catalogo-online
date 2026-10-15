@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { imgUrl, type Store } from "@/lib/utils";
+import { Stars } from "@/components/Stars";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q = "" } = await searchParams;
@@ -9,6 +10,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
   const { data } = await supabase.rpc("search_stores", { q: q.trim().replace(/[%,]/g, " ") });
   const stores = (data ?? []) as Store[];
 
+  const { data: stats } = stores.length ? await supabase.from("store_rating_stats").select("*").in("store_id", stores.map((s) => s.id)) : { data: [] };
+  const rating = new Map((stats ?? []).map((r) => [r.store_id, r]));
   const covers = new Map<string, string>();
   if (stores.length) {
     const { data: prods } = await supabase
@@ -39,9 +42,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
         <div className="grid stores">
           {stores.map((s) => (
             <Link key={s.id} href={`/${s.slug}`} className="card store">
-              <div className="cover">{covers.has(s.id) ? <img src={imgUrl(covers.get(s.id)!) + "?s=500"} alt="" loading="lazy" /> : <span>{s.name[0]}</span>}</div>
+              <div className="cover">{s.logo_url ? <img src={s.logo_url} alt="" className="contain" /> : covers.has(s.id) ? <img src={imgUrl(covers.get(s.id)!) + "?s=500"} alt="" loading="lazy" /> : <span>{s.name[0]}</span>}</div>
               <div className="body">
                 <strong>{s.name}</strong>
+                {rating.get(s.id) && <Stars value={Number(rating.get(s.id).avg_rating)} count={rating.get(s.id).total} />}
                 <span className="muted">{[s.category, s.city].filter(Boolean).join(" · ")}</span>
               </div>
             </Link>

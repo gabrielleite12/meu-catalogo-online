@@ -4,19 +4,15 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await supabaseServer();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) redirect("/login");
-  const { data: store } = await supabase.from("stores").select("slug").eq("owner_id", data.user.id).maybeSingle();
+  const { data } = await (await supabaseServer()).auth.getUser();
+  if (!data.user) redirect("/login?next=/painel");
   return (
     <>
       <header className="top">
         <Link href="/" className="logo">Expositor</Link>
         <nav>
-          <Link href="/painel">Loja</Link>
-          <Link href="/painel/produtos">Produtos</Link>
-          <Link href="/painel/importar">Importar do Drive</Link>
-          {store && <Link href={`/${store.slug}`} target="_blank">Ver catálogo ↗</Link>}
+          <Link href="/painel">Meus catálogos</Link>
+          <Link href="/conta">Minha conta e pedidos</Link>
         </nav>
         <form action={signOut}><button className="btn ghost">Sair</button></form>
       </header>

@@ -20,10 +20,12 @@ export async function middleware(req: NextRequest) {
     },
   );
   const { data } = await supabase.auth.getUser();
-  if (!data.user && req.nextUrl.pathname.startsWith("/painel")) {
-    return NextResponse.redirect(new URL("/login", req.url));
+  if (!data.user) {
+    const url = new URL("/login", req.url);
+    url.searchParams.set("next", req.nextUrl.pathname);
+    return NextResponse.redirect(url);
   }
   return res;
 }
 
-export const config = { matcher: ["/painel/:path*", "/login"] };
+export const config = { matcher: ["/painel/:path*", "/conta/:path*"] };

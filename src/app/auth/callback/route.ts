@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { safeNext } from "@/lib/utils";
 
 export async function GET(req: Request) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get("code");
+  const next = safeNext(searchParams.get("next"), "/painel");
   if (!code) return NextResponse.redirect(`${origin}/login`);
 
   const supabase = await supabaseServer();
@@ -18,5 +20,5 @@ export async function GET(req: Request) {
       .from("drive_tokens")
       .upsert({ user_id: data.session.user.id, refresh_token: refresh, updated_at: new Date().toISOString() });
   }
-  return NextResponse.redirect(`${origin}/painel`);
+  return NextResponse.redirect(`${origin}${next}`);
 }

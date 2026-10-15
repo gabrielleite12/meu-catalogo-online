@@ -26,28 +26,6 @@ export async function driveAccessToken(userId: string): Promise<string | null> {
   return j.access_token;
 }
 
-export type DriveItem = { id: string; name: string; mimeType: string };
-
-export async function listFolder(token: string, folderId: string): Promise<DriveItem[]> {
-  const q = `'${folderId.replace(/'/g, "")}' in parents and trashed=false and (mimeType='application/vnd.google-apps.folder' or mimeType contains 'image/')`;
-  const items: DriveItem[] = [];
-  let pageToken = "";
-  do {
-    const u = new URL("https://www.googleapis.com/drive/v3/files");
-    u.searchParams.set("q", q);
-    u.searchParams.set("fields", "nextPageToken,files(id,name,mimeType)");
-    u.searchParams.set("orderBy", "folder,name");
-    u.searchParams.set("pageSize", "200");
-    if (pageToken) u.searchParams.set("pageToken", pageToken);
-    const r = await fetch(u, { headers: { Authorization: `Bearer ${token}` } });
-    if (!r.ok) throw new Error(`Drive ${r.status}`);
-    const j = (await r.json()) as { files: DriveItem[]; nextPageToken?: string };
-    items.push(...j.files);
-    pageToken = j.nextPageToken ?? "";
-  } while (pageToken && items.length < 1000);
-  return items;
-}
-
 /** "foto_vestido-azul.JPG" -> "foto vestido azul" */
 export const nameFromFile = (f: string) =>
   f.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();

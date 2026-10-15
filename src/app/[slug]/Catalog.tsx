@@ -1,15 +1,23 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { brl, imgUrl, type Product } from "@/lib/utils";
+import Link from "next/link";
+import { brl, imgUrl, type Product, type Rating, type Review } from "@/lib/utils";
+import { Stars } from "@/components/Stars";
+import { placeOrder } from "./actions";
 
 type S = { slug: string; name: string; whatsapp: string | null };
 
-export default function Catalog({ store, products }: { store: S; products: Product[] }) {
+type Viewer = { loggedIn: boolean; hasProfile: boolean };
+
+export default function Catalog({ store, products, ratings, reviews, viewer }: {
+  store: S; products: Product[]; ratings: Record<string, Rating>; reviews: Record<string, Review[]>; viewer: Viewer;
+}) {
   const key = `cart:${store.slug}`;
   const [cart, setCart] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const [nome, setNome] = useState("");
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState("");
   const [obs, setObs] = useState("");
   const [zoom, setZoom] = useState<Product | null>(null);
 
@@ -31,16 +39,15 @@ export default function Catalog({ store, products }: { store: S; products: Produ
   const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const filtered = products.filter((p) => norm(p.name).includes(norm(q)));
 
-  const message = () => {
-    const rows = lines.map((l) => `• ${l.n}x ${l.p.name}${l.p.price != null ? ` — ${brl(l.p.price * l.n)}` : ""}`);
-    return [
-      `Olá! Gostaria de fazer um pedido na *${store.name}*:`, "",
-      ...rows, "",
-      total > 0 ? `*Total:* ${brl(total)}${hasUnpriced ? " (+ itens sob consulta)" : ""}` : "",
-      nome ? `Nome: ${nome}` : "", obs ? `Obs.: ${obs}` : "",
-    ].filter((l, i, a) => l !== "" || (a[i - 1] !== "" && i > 0)).join("\n").trim();
-  };
-  const link = store.whatsapp ? `https://wa.me/${store.whatsapp.length <= 11 ? "55" + store.whatsapp : store.whatsapp}?text=${encodeURIComponent(message())}` : null;
+  async function send() {
+    setErr(""); setSending(true);
+    const win = window.open("", "_blank");
+    const r = await placeOrder({ slug: store.slug, items: lines.map((l) => ({ id: l.p.id, qty: l.n })), notes: obs });
+    setSending(false);
+    if (!r.link) { win?.close(); return setErr(r.error ?? "Erro ao enviar."); }
+    setCart({}); setOpen(false);
+    if (win) win.location.href = r.link; else window.location.href = r.link;
+  }
 
   const Qty = ({ p }: { p: Product }) => {
     const n = cart[p.id] ?? 0;
@@ -68,6 +75,7 @@ export default function Catalog({ store, products }: { store: S; products: Produ
               </button>
               <div className="body">
                 <strong>{p.name}</strong>
+                {ratings[p.id] && <Stars value={ratings[p.id].avg_rating} count={ratings[p.id].total} />}
                 <span className="price">{p.price != null ? brl(p.price) : "Sob consulta"}</span>
                 {p.track_stock && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5 && <small className="muted">Restam {p.stock}</small>}
                 <Qty p={p} />
@@ -91,12 +99,14 @@ export default function Catalog({ store, products }: { store: S; products: Produ
             ))}
             <div className="between total"><span>Total</span><b>{total > 0 ? brl(total) : "—"}</b></div>
             <div className="form">
-              <label>Seu nome<input value={nome} onChange={(e) => setNome(e.target.value)} /></label>
               <label>Observações<textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Endereço, forma de pagamento, retirada…" /></label>
             </div>
-            {link
-              ? <a className="btn whats block" href={link} target="_blank" rel="noopener">Enviar pedido pelo WhatsApp</a>
-              : <p className="err">Esta loja ainda não informou um WhatsApp.</p>}
+            {err && <p className="err">{err}</p>}
+            {!store.whatsapp ? <p className="err">Esta loja ainda não informou um WhatsApp.</p>
+              : !viewer.loggedIn ? <Link className="btn primary block" href={`/login?next=/${store.slug}`}>Entrar para fazer o pedido</Link>
+              : !viewer.hasProfile ? <Link className="btn primary block" href={`/conta?next=/${store.slug}`}>Completar cadastro para pedir</Link>
+              : <button className="btn whats block" disabled={sending} onClick={send}>{sending ? "Enviando…" : "Enviar pedido pelo WhatsApp"}</button>}
+            <small className="muted">Seu nome, telefone e endereço cadastrados vão junto com o pedido.</small>
             <button className="link" onClick={() => setCart({})}>Limpar pedido</button>
           </aside>
         </div>
@@ -112,8 +122,14 @@ export default function Catalog({ store, products }: { store: S; products: Produ
               ))}
             </div>
             <h2>{zoom.name}</h2>
+            {ratings[zoom.id] && <Stars value={ratings[zoom.id].avg_rating} count={ratings[zoom.id].total} />}
             {zoom.description && <p>{zoom.description}</p>}
             <div className="between"><span className="price">{zoom.price != null ? brl(zoom.price) : "Sob consulta"}</span><Qty p={zoom} /></div>
+            <h3>Avaliações deste produto</h3>
+            {!(reviews[zoom.id]?.length) && <p className="muted">Sem avaliações ainda.</p>}
+            {(reviews[zoom.id] ?? []).map((v) => (
+              <div key={v.id} className="rv"><div className="between"><strong>{v.reviewer_name}</strong><Stars value={v.rating} /></div>{v.comment && <p>{v.comment}</p>}</div>
+            ))}
           </div>
         </div>
       )}
