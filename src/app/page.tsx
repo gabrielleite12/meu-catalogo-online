@@ -1,0 +1,53 @@
+import Link from "next/link";
+import { supabaseServer } from "@/lib/supabase/server";
+import { imgUrl, type Store } from "@/lib/utils";
+
+export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q = "" } = await searchParams;
+  const supabase = await supabaseServer();
+  const { data: user } = await supabase.auth.getUser();
+  const { data } = await supabase.rpc("search_stores", { q: q.trim().replace(/[%,]/g, " ") });
+  const stores = (data ?? []) as Store[];
+
+  const covers = new Map<string, string>();
+  if (stores.length) {
+    const { data: prods } = await supabase
+      .from("products").select("store_id, product_images(drive_file_id,position)")
+      .in("store_id", stores.map((s) => s.id)).eq("active", true).order("position").limit(400);
+    for (const p of prods ?? []) {
+      const first = [...(p.product_images as { drive_file_id: string; position: number }[])].sort((a, b) => a.position - b.position)[0];
+      if (first && !covers.has(p.store_id)) covers.set(p.store_id, first.drive_file_id);
+    }
+  }
+
+  return (
+    <>
+      <header className="top">
+        <Link href="/" className="logo">Expositor</Link>
+        <nav />
+        {user.user ? <Link className="btn" href="/painel">Meu painel</Link> : <Link className="btn" href="/login">Criar meu catálogo</Link>}
+      </header>
+      <main className="wrap">
+        <section className="hero">
+          <h1>Encontre lojas e produtos</h1>
+          <form className="search" action="/">
+            <input name="q" defaultValue={q} placeholder="Busque por loja, tipo de produto ou cidade…" autoFocus={!!q} />
+            <button className="btn primary">Buscar</button>
+          </form>
+        </section>
+        {!stores.length && <p className="muted center-text">{q ? "Nenhuma loja encontrada." : "Ainda não há catálogos publicados."}</p>}
+        <div className="grid stores">
+          {stores.map((s) => (
+            <Link key={s.id} href={`/${s.slug}`} className="card store">
+              <div className="cover">{covers.has(s.id) ? <img src={imgUrl(covers.get(s.id)!) + "?s=500"} alt="" loading="lazy" /> : <span>{s.name[0]}</span>}</div>
+              <div className="body">
+                <strong>{s.name}</strong>
+                <span className="muted">{[s.category, s.city].filter(Boolean).join(" · ")}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </main>
+    </>
+  );
+}
