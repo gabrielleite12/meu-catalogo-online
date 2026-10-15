@@ -28,7 +28,8 @@ export default function Catalog({ store, products }: { store: S; products: Produ
   const total = lines.reduce((a, l) => a + (l.p.price ?? 0) * l.n, 0);
   const hasUnpriced = lines.some((l) => l.p.price == null);
 
-  const filtered = products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
+  const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const filtered = products.filter((p) => norm(p.name).includes(norm(q)));
 
   const message = () => {
     const rows = lines.map((l) => `• ${l.n}x ${l.p.name}${l.p.price != null ? ` — ${brl(l.p.price * l.n)}` : ""}`);
