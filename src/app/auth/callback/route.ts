@@ -7,11 +7,11 @@ export async function GET(req: Request) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"), "/painel");
-  if (!code) return NextResponse.redirect(`${origin}/login`);
+  if (!code) return NextResponse.redirect(`${origin}/login?erro=1`);
 
   const supabase = await supabaseServer();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error || !data.session) return NextResponse.redirect(`${origin}/login`);
+  if (error || !data.session) return NextResponse.redirect(`${origin}/login?erro=1`);
 
   // O refresh token só vem neste momento: guardamos para ler o Drive depois.
   const refresh = data.session.provider_refresh_token;

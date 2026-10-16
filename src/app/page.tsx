@@ -27,7 +27,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
     <>
       <header className="top">
         <Link href="/" className="logo">Expositor</Link>
-        <nav />
+        <nav><Link href="/ajuda">Como funciona</Link></nav>
         {user.user ? <Link className="btn" href="/painel">Meu painel</Link> : <Link className="btn" href="/login">Criar meu catálogo</Link>}
       </header>
       <main className="wrap">

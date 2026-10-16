@@ -13,6 +13,7 @@ export default async function PainelLayout({ children }: { children: React.React
         <nav>
           <Link href="/painel">Meus catálogos</Link>
           <Link href="/conta">Minha conta e pedidos</Link>
+          <Link href="/ajuda">Ajuda</Link>
         </nav>
         <form action={signOut}><button className="btn ghost">Sair</button></form>
       </header>

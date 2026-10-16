@@ -95,3 +95,6 @@ input[type=checkbox]{width:auto}
 .reviews{margin-top:40px}.rv{padding:12px 14px;margin:10px 0;display:grid;gap:4px}.rv p{margin:4px 0}
 .danger-zone{margin-top:24px;display:grid;gap:6px;justify-items:start}
 .card.narrow{max-width:420px}
+.prose{max-width:760px}.prose h2{margin:32px 0 10px}.prose li{margin:8px 0}.prose code{background:var(--soft);padding:1px 6px;border-radius:6px;font-size:14px}
+.note{padding:16px 20px;margin:12px 0}.note h3{margin:0 0 6px;font-size:16px}.note p{margin:6px 0}
+.prose a{color:var(--brand);text-decoration:underline}
