@@ -73,8 +73,9 @@ function Editor({ p, storeId, rating }: { p: Product; storeId: string; rating?: 
       <div className="between">
         <label className="check"><input type="checkbox" name="active" defaultChecked={p.active} /> Visível no catálogo</label>
         <div className="actions">
-          <button className="btn primary">Salvar</button>
-          <button className="btn" formAction={duplicateProduct} formNoValidate>Duplicar</button>
+          <button type="submit" className="btn primary">Salvar</button>
+          <button className="btn" formAction={duplicateProduct} formNoValidate
+            onClick={(e) => { if (!confirm(`Criar uma cópia oculta de "${p.name}"?`)) e.preventDefault(); }}>Duplicar</button>
           <button className="btn danger" formAction={deleteProduct} formNoValidate
             onClick={(e) => { if (!confirm(`Excluir "${p.name}"?`)) e.preventDefault(); }}>Excluir</button>
         </div>
