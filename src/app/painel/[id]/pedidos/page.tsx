@@ -1,6 +1,7 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import { brl } from "@/lib/utils";
 import { setOrderStatus } from "../../actions";
+import SubmitButton from "@/components/SubmitButton";
 
 const LABEL: Record<string, string> = { novo: "Novo", finalizado: "Finalizado", cancelado: "Cancelado" };
 
@@ -34,8 +35,8 @@ export default async function Pedidos({ params }: { params: Promise<{ id: string
               {o.status === "novo" && (
                 <form action={setOrderStatus} className="actions">
                   <input type="hidden" name="id" value={o.id} />
-                  <button className="btn primary" name="status" value="finalizado">Marcar como finalizado</button>
-                  <button className="btn danger" name="status" value="cancelado">Cancelar</button>
+                  <SubmitButton className="btn primary" name="status" value="finalizado" pendingText="Finalizando…">Marcar como finalizado</SubmitButton>
+                  <SubmitButton className="btn danger" name="status" value="cancelado" pendingText="Cancelando…">Cancelar</SubmitButton>
                 </form>
               )}
             </div>

@@ -128,3 +128,5 @@ input[type=checkbox]{width:auto}
 .card.danger-zone{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px;margin-top:24px;border-color:#f1c9c4;flex-wrap:wrap}
 .center-overlay{justify-content:center;align-items:center;padding:16px}.center-overlay .card{width:min(440px,100%)}
 .vlist{display:grid;gap:2px;margin:6px 0}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}

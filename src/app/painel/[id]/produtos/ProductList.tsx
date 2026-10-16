@@ -14,6 +14,7 @@ function Editor({ p, rating }: { p: Product; rating?: { avg_rating: number; tota
   const [colors, setColors] = useState("");
   const [track, setTrack] = useState(p.track_stock);
   const [st, act, saving] = useActionState(updateProduct, {});
+  const [busy, setBusy] = useState<"" | "dup" | "del">("");
   const set = (i: number, k: keyof Row, v: string) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
   function generate() {
@@ -76,11 +77,11 @@ function Editor({ p, rating }: { p: Product; rating?: { avg_rating: number; tota
       <div className="between">
         <label className="check"><input type="checkbox" name="active" defaultChecked={p.active} /> Visível no catálogo</label>
         <div className="actions">
-          <button type="submit" className="btn primary" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</button>
-          <button className="btn" formAction={duplicateProduct} formNoValidate
-            onClick={(e) => { if (!confirm(`Criar uma cópia oculta de "${p.name}"?`)) e.preventDefault(); }}>Duplicar</button>
-          <button className="btn danger" formAction={deleteProduct} formNoValidate
-            onClick={(e) => { if (!confirm(`Excluir "${p.name}"?`)) e.preventDefault(); }}>Excluir</button>
+          <button type="submit" className="btn primary" disabled={saving || !!busy}>{saving ? "Salvando…" : "Salvar"}</button>
+          <button className="btn" formAction={duplicateProduct} formNoValidate disabled={!!busy || saving}
+            onClick={(e) => { if (!confirm(`Criar uma cópia oculta de "${p.name}"?`)) e.preventDefault(); else setBusy("dup"); }}>{busy === "dup" ? "Duplicando…" : "Duplicar"}</button>
+          <button className="btn danger" formAction={deleteProduct} formNoValidate disabled={!!busy || saving}
+            onClick={(e) => { if (!confirm(`Excluir "${p.name}"?`)) e.preventDefault(); else setBusy("del"); }}>{busy === "del" ? "Excluindo…" : "Excluir"}</button>
         </div>
       </div>
     </form>
@@ -122,6 +123,7 @@ export default function ProductList({ products, storeId, ratings }: {
       {sel.size > 0 && (
         <div className="bulkbar">
           <b>{sel.size} selecionado(s)</b>
+          {pending && <span className="spin" />}
           <button className="btn sm" disabled={pending} onClick={() => bulk("show")}>Mostrar</button>
           <button className="btn sm" disabled={pending} onClick={() => bulk("hide")}>Ocultar</button>
           <button className="btn sm danger" disabled={pending} onClick={() => bulk("delete")}>Excluir</button>
