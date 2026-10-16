@@ -33,24 +33,44 @@ export default function Importer({ storeId, products, used, initialProduct }: {
 
   const loadPicker = () => gapi.load("picker", () => setReady(true));
 
-  async function openPicker() {
-    setErr("");
+  const [info, setInfo] = useState("");
+
+  async function openPicker(kind: "photos" | "folder") {
+    setErr(""); setInfo("");
     if (!API_KEY || !APP_ID) return setErr("Chave do Google Picker não configurada (NEXT_PUBLIC_GOOGLE_API_KEY / NEXT_PUBLIC_GOOGLE_APP_ID).");
     const r = await fetch("/api/drive/token");
     if (!r.ok) return setConnected(false);
     const { token } = await r.json();
-    const view = new google.picker.DocsView(google.picker.ViewId.DOCS_IMAGES)
-      .setIncludeFolders(true).setSelectFolderEnabled(false).setMode(google.picker.DocsViewMode.GRID);
-    new google.picker.PickerBuilder()
-      .setAppId(APP_ID).setDeveloperKey(API_KEY).setOAuthToken(token)
-      .setLocale("pt-BR").setTitle("Escolha as fotos dos produtos")
-      .addView(view).addView(new google.picker.DocsUploadView())
-      .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-      .setCallback((d: any) => {
-        if (d.action !== google.picker.Action.PICKED) return;
+    const b = new google.picker.PickerBuilder()
+      .setAppId(APP_ID).setDeveloperKey(API_KEY).setOAuthToken(token).setLocale("pt-BR");
+    if (kind === "photos") {
+      const view = new google.picker.DocsView(google.picker.ViewId.DOCS_IMAGES)
+        .setIncludeFolders(true).setSelectFolderEnabled(false).setMode(google.picker.DocsViewMode.GRID);
+      b.setTitle("Escolha as fotos dos produtos").addView(view).addView(new google.picker.DocsUploadView())
+        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
+    } else {
+      const view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+        .setIncludeFolders(true).setSelectFolderEnabled(true).setMimeTypes("application/vnd.google-apps.folder");
+      b.setTitle("Escolha a pasta com as fotos").addView(view).enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
+    }
+    b.setCallback(async (d: any) => {
+      if (d.action !== google.picker.Action.PICKED) return;
+      if (kind === "photos") {
         setSel((m) => { const n = new Map(m); (d.docs as any[]).forEach((x) => n.set(x.id, x.name)); return n; });
-      })
-      .build().setVisible(true);
+        return;
+      }
+      let total = 0;
+      for (const folder of d.docs as any[]) {
+        const res = await fetch(`/api/drive/folder?id=${folder.id}`);
+        if (!res.ok) { setErr("Não foi possível ler a pasta. Tente escolher as fotos manualmente."); continue; }
+        const { files } = (await res.json()) as { files: Picked[] };
+        total += files.length;
+        setSel((m) => { const n = new Map(m); files.forEach((f) => n.set(f.id, f.name)); return n; });
+      }
+      if (total) setInfo(`${total} foto(s) encontradas na pasta. Agora escolha como criar os produtos.`);
+      else setErr("O Google não liberou o conteúdo desta pasta para o app. Use “Escolher fotos” e, dentro da pasta, selecione todas (Ctrl+A ou Shift+clique).");
+    });
+    b.build().setVisible(true);
   }
 
   const files: Picked[] = [...sel].map(([id, name]) => ({ id, name }));
@@ -75,9 +95,13 @@ export default function Importer({ storeId, products, used, initialProduct }: {
   return (
     <>
       <Script src="https://apis.google.com/js/api.js" onLoad={loadPicker} />
-      <button className="btn primary" disabled={!ready || connected === null} onClick={openPicker}>
-        📁 Escolher fotos no Google Drive
-      </button>
+      <div className="actions wrapx">
+        <button className="btn primary" disabled={!ready || connected === null} onClick={() => openPicker("photos")}>🖼️ Escolher fotos</button>
+        <button className="btn" disabled={!ready || connected === null} onClick={() => openPicker("folder")}>📁 Importar pasta inteira</button>
+        {sel.size > 0 && <button className="btn ghost" onClick={() => setSel(new Map())}>Limpar seleção</button>}
+      </div>
+      <small className="muted block">Dica: na janela do Google, use Ctrl+A ou Shift+clique para marcar várias fotos de uma vez.</small>
+      {info && <p className="ok">{info}</p>}
       {err && <p className="err">{err}</p>}
 
       <div className="grid pick">
@@ -93,7 +117,7 @@ export default function Importer({ storeId, products, used, initialProduct }: {
 
       <div className="dock">
         <strong>{sel.size} selecionada{sel.size === 1 ? "" : "s"}</strong>
-        <button className="btn primary" disabled={!sel.size || pending} onClick={() => run("each")}>Um produto por foto</button>
+        <button className="btn primary" disabled={!sel.size || pending} onClick={() => run("each")}>{pending ? "Criando…" : `Criar ${sel.size || ""} produto(s), um por foto`}</button>
         <span className="group">
           <input placeholder="Nome do produto" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
           <button className="btn" disabled={!sel.size || pending} onClick={() => run("group")}>Juntar em um produto</button>

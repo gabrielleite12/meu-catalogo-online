@@ -12,7 +12,7 @@ async function load(slug: string) {
   const { data: store } = await supabase.from("stores").select("*").eq("slug", slug).maybeSingle();
   if (!store) return null;
   const { data: products } = await supabase
-    .from("products").select("*, product_images(id,drive_file_id,position)")
+    .from("products").select("*, product_images(id,drive_file_id,position), product_variants(*)")
     .eq("store_id", store.id).eq("active", true).order("position").order("created_at");
   const ids = (products ?? []).map((p) => p.id);
   const [{ data: sStat }, { data: pStats }, { data: sRev }, { data: pRev }] = await Promise.all([

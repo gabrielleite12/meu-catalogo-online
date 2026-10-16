@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { Store } from "@/lib/utils";
+import DeleteStore from "./DeleteStore";
 
 export default async function Painel() {
   const supabase = await supabaseServer();
@@ -55,7 +56,9 @@ export default async function Painel() {
                   <Link className="btn sm" href={`/painel/${s.id}/produtos`}>Produtos</Link>
                   <Link className="btn sm" href={`/painel/${s.id}/importar`}>Importar</Link>
                   <Link className="btn sm" href={`/painel/${s.id}/pedidos`}>Pedidos</Link>
+                  <Link className="btn sm" href={`/painel/${s.id}`}>Configurar</Link>
                   <Link className="btn sm" href={`/${s.slug}`} target="_blank">Ver ↗</Link>
+                  <DeleteStore id={s.id} name={s.name} small />
                 </div>
               </div>
             </div>

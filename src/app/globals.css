@@ -111,3 +111,20 @@ input[type=checkbox]{width:auto}
 .acct{display:flex;gap:14px;align-items:center;padding:14px 18px;margin:12px 0 20px;flex-wrap:wrap}.acct img{width:48px;height:48px;border-radius:50%}.acct .btn{margin-left:auto}
 .store .actions{flex-wrap:wrap;margin-top:6px}
 @media(max-width:600px){.nm{display:none}.top nav{display:none}}
+.wrapx{flex-wrap:wrap;margin:10px 0}
+.toolbar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:12px 0}.toolbar input[type=text],.toolbar>input:not([type]){max-width:340px;border-radius:999px}
+.bulkbar{display:flex;gap:10px;align-items:center;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px;position:sticky;top:64px;z-index:4}
+.card.prod.off{opacity:.65}.card.prod{padding:0}
+.phead{display:flex;gap:12px;align-items:center;padding:10px 14px}.pmain{all:unset;flex:1;display:flex;gap:12px;align-items:center;cursor:pointer;min-width:0}
+.pthumb{width:52px;height:52px;border-radius:10px;overflow:hidden;background:var(--soft);flex:none}.pthumb img{width:100%;height:100%;object-fit:cover}
+.pinfo{display:grid;min-width:0;flex:1}.pinfo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chev{color:var(--muted);font-size:12px}
+.pbody{padding:4px 16px 16px;border-top:1px solid var(--line)}.pbody .thumbs{margin-top:14px}
+.variants{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:10px}.variants legend{padding:0 6px;font-size:14px}
+.gen{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+.vtable{display:grid;gap:6px;overflow-x:auto}.vhead,.vrow{display:grid;grid-template-columns:1.4fr 1fr .9fr .9fr 32px;gap:6px;min-width:520px}.vhead{font-size:12px;color:var(--muted)}
+.vrow input{padding:7px 10px}.x{all:unset;cursor:pointer;color:var(--danger);font-size:20px;text-align:center}
+@media(max-width:600px){.gen{grid-template-columns:1fr}}
+.sec{margin:14px 0 0;padding-top:14px;border-top:1px solid var(--line);font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--brand-d)}.sec:first-of-type{border:0;margin-top:0;padding-top:0}
+.card.danger-zone{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px;margin-top:24px;border-color:#f1c9c4;flex-wrap:wrap}
+.center-overlay{justify-content:center;align-items:center;padding:16px}.center-overlay .card{width:min(440px,100%)}
+.vlist{display:grid;gap:2px;margin:6px 0}

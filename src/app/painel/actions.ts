@@ -76,33 +76,80 @@ export async function importFiles(input: { storeId: string; mode: "each" | "grou
     if (error) return { error: error.message };
   } else {
     const groups: FileRef[][] = input.mode === "each" ? input.files.map((f) => [f]) : [input.files];
-    for (const g of groups) {
-      const name = input.mode === "group" && input.groupName?.trim() ? input.groupName.trim() : nameFromFile(g[0].name);
-      const { data: p, error } = await supabase
-        .from("products").insert({ store_id: store.id, name, position: pos++ }).select("id").single();
-      if (error || !p) return { error: error?.message ?? "Erro ao criar produto." };
-      const { error: e2 } = await supabase.from("product_images").insert(
-        g.map((f, i) => ({ product_id: p.id, drive_file_id: f.id, position: i })),
-      );
-      if (e2) return { error: e2.message };
-    }
+    const rows = groups.map((g, i) => ({
+      store_id: store.id, position: pos + i,
+      name: input.mode === "group" && input.groupName?.trim() ? input.groupName.trim() : nameFromFile(g[0].name),
+    }));
+    // inserção em lote: uma consulta para os produtos e outra para as fotos
+    const { data: created, error } = await supabase.from("products").insert(rows).select("id,position");
+    if (error || !created) return { error: error?.message ?? "Erro ao criar produtos." };
+    const byPos = new Map(created.map((c) => [c.position, c.id]));
+    const imgs = groups.flatMap((g, gi) => g.map((f, i) => ({ product_id: byPos.get(pos + gi)!, drive_file_id: f.id, position: i })));
+    const { error: e2 } = await supabase.from("product_images").insert(imgs);
+    if (e2) return { error: e2.message };
   }
   refresh();
   return { ok: true };
 }
 
+type VariantInput = { id?: string; name: string; sku?: string; price?: string | number | null; stock?: string | number | null };
+const num = (v: unknown) => {
+  const t = String(v ?? "").replace(/\./g, "").replace(",", ".").trim();
+  return t !== "" && !isNaN(Number(t)) ? Number(t) : null;
+};
+
 export async function updateProduct(fd: FormData) {
   const { supabase } = await ctx();
-  const price = String(fd.get("price") ?? "").replace(/\./g, "").replace(",", ".").trim();
+  const id = String(fd.get("id"));
   const track = fd.get("track_stock") === "on";
+  let variants: VariantInput[] = [];
+  try { variants = JSON.parse(String(fd.get("variants") || "[]")); } catch {}
+  variants = variants.filter((v) => v.name?.trim()).slice(0, 200);
+
   await supabase.from("products").update({
     name: String(fd.get("name") ?? "").trim() || "Sem nome",
+    sku: String(fd.get("sku") ?? "").trim() || null,
     description: String(fd.get("description") ?? "").trim() || null,
-    price: price && !isNaN(Number(price)) ? Number(price) : null,
-    track_stock: track,
-    stock: track ? Math.max(0, parseInt(String(fd.get("stock") ?? "0"), 10) || 0) : null,
+    price: num(fd.get("price")),
+    track_stock: variants.length ? false : track,
+    stock: variants.length ? null : track ? Math.max(0, parseInt(String(fd.get("stock") ?? "0"), 10) || 0) : null,
     active: fd.get("active") === "on",
-  }).eq("id", String(fd.get("id")));
+  }).eq("id", id);
+
+  // sincroniza variações: remove as apagadas, atualiza as existentes, cria as novas
+  const { data: current } = await supabase.from("product_variants").select("id").eq("product_id", id);
+  const keep = new Set(variants.map((v) => v.id).filter(Boolean));
+  const gone = (current ?? []).map((c) => c.id).filter((c) => !keep.has(c));
+  if (gone.length) await supabase.from("product_variants").delete().in("id", gone);
+  for (const [position, v] of variants.entries()) {
+    const stock = num(v.stock);
+    const row = { name: v.name.trim(), sku: v.sku?.trim() || null, price: num(v.price), stock: stock == null ? null : Math.max(0, Math.floor(stock)), position };
+    if (v.id) await supabase.from("product_variants").update(row).eq("id", v.id);
+    else await supabase.from("product_variants").insert({ ...row, product_id: id });
+  }
+  refresh();
+}
+
+export async function bulkProducts(input: { ids: string[]; action: "delete" | "hide" | "show" }) {
+  const { supabase } = await ctx();
+  if (!input.ids.length) return;
+  if (input.action === "delete") await supabase.from("products").delete().in("id", input.ids);
+  else await supabase.from("products").update({ active: input.action === "show" }).in("id", input.ids);
+  refresh();
+}
+
+export async function duplicateProduct(fd: FormData) {
+  const { supabase } = await ctx();
+  const { data: p } = await supabase.from("products")
+    .select("*, product_images(drive_file_id,position), product_variants(name,sku,price,stock,position)").eq("id", String(fd.get("id"))).single();
+  if (!p) return;
+  const { data: copy } = await supabase.from("products").insert({
+    store_id: p.store_id, name: `${p.name} (cópia)`, sku: null, description: p.description, price: p.price,
+    track_stock: p.track_stock, stock: p.stock, active: false, position: p.position + 1,
+  }).select("id").single();
+  if (!copy) return;
+  if (p.product_images.length) await supabase.from("product_images").insert(p.product_images.map((i: object) => ({ ...i, product_id: copy.id })));
+  if (p.product_variants.length) await supabase.from("product_variants").insert(p.product_variants.map((v: object) => ({ ...v, product_id: copy.id })));
   refresh();
 }
 
@@ -133,8 +180,13 @@ export async function setOrderStatus(fd: FormData) {
   if (error) return;
 
   if (status === "finalizado") {
-    const { data: items } = await supabase.from("order_items").select("product_id,qty").eq("order_id", id);
+    const { data: items } = await supabase.from("order_items").select("product_id,variant_id,qty").eq("order_id", id);
     for (const it of items ?? []) {
+      if (it.variant_id) {
+        const { data: v } = await supabase.from("product_variants").select("stock").eq("id", it.variant_id).maybeSingle();
+        if (v && v.stock != null) await supabase.from("product_variants").update({ stock: Math.max(0, v.stock - it.qty) }).eq("id", it.variant_id);
+        continue;
+      }
       if (!it.product_id) continue;
       const { data: p } = await supabase.from("products").select("track_stock,stock").eq("id", it.product_id).maybeSingle();
       if (p?.track_stock) await supabase.from("products").update({ stock: Math.max(0, (p.stock ?? 0) - it.qty) }).eq("id", it.product_id);

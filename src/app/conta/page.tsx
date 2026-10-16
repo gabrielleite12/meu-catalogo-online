@@ -7,7 +7,7 @@ import ReviewForm from "./ReviewForm";
 import { reviewStore, reviewProduct } from "./actions";
 
 const LABEL: Record<string, string> = { novo: "Aguardando a loja", finalizado: "Finalizado", cancelado: "Cancelado" };
-type Item = { id: string; product_id: string | null; name: string; price: number | null; qty: number };
+type Item = { id: string; product_id: string | null; name: string; variant_name?: string | null; price: number | null; qty: number };
 
 export default async function Conta({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
@@ -15,7 +15,7 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
   const { data: u } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", u.user!.id).maybeSingle();
   const { data: orders } = await supabase
-    .from("orders").select("*, stores(name,slug), order_items(id,product_id,name,price,qty)")
+    .from("orders").select("*, stores(name,slug), order_items(id,product_id,name,variant_name,price,qty)")
     .eq("customer_id", u.user!.id).order("created_at", { ascending: false }).limit(50);
   const ids = (orders ?? []).map((o) => o.id);
   const { data: sr } = ids.length ? await supabase.from("store_reviews").select("order_id").in("order_id", ids) : { data: [] };
@@ -51,7 +51,7 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
               <ul className="items">
                 {o.order_items.map((i: Item) => (
                   <li key={i.id}>
-                    {i.qty}× {i.name}
+                    {i.qty}× {i.name}{i.variant_name ? ` (${i.variant_name})` : ""}
                     {o.status === "finalizado" && i.product_id && !itemDone.has(i.id) && (
                       <ReviewForm action={reviewProduct} fields={{ item_id: i.id }} label={`Avaliar ${i.name}`} />
                     )}

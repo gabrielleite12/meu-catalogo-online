@@ -1,62 +1,76 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { brl, imgUrl, type Product, type Rating, type Review } from "@/lib/utils";
+import { brl, imgUrl, type Product, type Rating, type Review, type Variant } from "@/lib/utils";
 import { Stars } from "@/components/Stars";
 import { placeOrder } from "./actions";
 
 type S = { slug: string; name: string; whatsapp: string | null };
-
 type Viewer = { loggedIn: boolean; hasProfile: boolean };
+
+const vars = (p: Product) => p.product_variants.filter((v) => v.active).sort((a, b) => a.position - b.position);
+const key = (p: Product, v?: Variant) => `${p.id}|${v?.id ?? ""}`;
+const avail = (p: Product, v?: Variant) => (v ? (v.stock == null ? 999 : v.stock) : p.track_stock ? p.stock ?? 0 : 999);
+const priceOf = (p: Product, v?: Variant) => (v?.price ?? p.price) as number | null;
+const soldOut = (p: Product) => (vars(p).length ? vars(p).every((v) => avail(p, v) <= 0) : avail(p) <= 0);
+const norm = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+function priceLabel(p: Product) {
+  const vs = vars(p);
+  const prices = (vs.length ? vs.map((v) => priceOf(p, v)) : [p.price]).filter((x): x is number => x != null);
+  if (!prices.length) return "Sob consulta";
+  const min = Math.min(...prices), max = Math.max(...prices);
+  return min === max ? brl(min) : `a partir de ${brl(min)}`;
+}
 
 export default function Catalog({ store, products, ratings, reviews, viewer }: {
   store: S; products: Product[]; ratings: Record<string, Rating>; reviews: Record<string, Review[]>; viewer: Viewer;
 }) {
-  const key = `cart:${store.slug}`;
+  const storageKey = `cart2:${store.slug}`;
   const [cart, setCart] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [obs, setObs] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
-  const [obs, setObs] = useState("");
   const [zoom, setZoom] = useState<Product | null>(null);
 
-  useEffect(() => { try { setCart(JSON.parse(localStorage.getItem(key) || "{}")); } catch {} }, [key]);
-  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(cart)); } catch {} }, [cart, key]);
+  useEffect(() => { try { setCart(JSON.parse(localStorage.getItem(storageKey) || "{}")); } catch {} }, [storageKey]);
+  useEffect(() => { try { localStorage.setItem(storageKey, JSON.stringify(cart)); } catch {} }, [cart, storageKey]);
 
-  const max = (p: Product) => (p.track_stock ? p.stock ?? 0 : 999);
-  const set = (p: Product, n: number) =>
-    setCart((c) => { const x = { ...c }; const v = Math.max(0, Math.min(n, max(p))); v ? (x[p.id] = v) : delete x[p.id]; return x; });
+  const setQty = (p: Product, v: Variant | undefined, n: number) =>
+    setCart((c) => { const x = { ...c }; const val = Math.max(0, Math.min(n, avail(p, v))); val ? (x[key(p, v)] = val) : delete x[key(p, v)]; return x; });
 
-  const lines = useMemo(
-    () => products.filter((p) => cart[p.id]).map((p) => ({ p, n: Math.min(cart[p.id], max(p)) })).filter((l) => l.n > 0),
-    [cart, products],
-  );
+  const lines = useMemo(() => {
+    const out: { p: Product; v?: Variant; n: number }[] = [];
+    for (const p of products) {
+      const vs = vars(p);
+      if (vs.length) vs.forEach((v) => { const n = Math.min(cart[key(p, v)] ?? 0, avail(p, v)); if (n > 0) out.push({ p, v, n }); });
+      else { const n = Math.min(cart[key(p)] ?? 0, avail(p)); if (n > 0) out.push({ p, n }); }
+    }
+    return out;
+  }, [cart, products]);
   const count = lines.reduce((a, l) => a + l.n, 0);
-  const total = lines.reduce((a, l) => a + (l.p.price ?? 0) * l.n, 0);
-  const hasUnpriced = lines.some((l) => l.p.price == null);
-
-  const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const filtered = products.filter((p) => norm(p.name).includes(norm(q)));
+  const total = lines.reduce((a, l) => a + (priceOf(l.p, l.v) ?? 0) * l.n, 0);
+  const filtered = products.filter((p) => norm(p.name + " " + (p.sku ?? "")).includes(norm(q)));
 
   async function send() {
     setErr(""); setSending(true);
     const win = window.open("", "_blank");
-    const r = await placeOrder({ slug: store.slug, items: lines.map((l) => ({ id: l.p.id, qty: l.n })), notes: obs });
+    const r = await placeOrder({ slug: store.slug, items: lines.map((l) => ({ id: l.p.id, variantId: l.v?.id, qty: l.n })), notes: obs });
     setSending(false);
     if (!r.link) { win?.close(); return setErr(r.error ?? "Erro ao enviar."); }
     setCart({}); setOpen(false);
     if (win) win.location.href = r.link; else window.location.href = r.link;
   }
 
-  const Qty = ({ p }: { p: Product }) => {
-    const n = cart[p.id] ?? 0;
-    const out = p.track_stock && (p.stock ?? 0) <= 0;
-    if (out) return <span className="muted">Esgotado</span>;
+  const Qty = ({ p, v }: { p: Product; v?: Variant }) => {
+    const n = cart[key(p, v)] ?? 0;
+    if (avail(p, v) <= 0) return <span className="muted">Esgotado</span>;
     return n === 0 ? (
-      <button className="btn primary sm" onClick={() => set(p, 1)}>Adicionar</button>
+      <button className="btn primary sm" onClick={() => setQty(p, v, 1)}>Adicionar</button>
     ) : (
-      <span className="qty"><button onClick={() => set(p, n - 1)} aria-label="menos">−</button><b>{n}</b><button onClick={() => set(p, n + 1)} disabled={n >= max(p)} aria-label="mais">+</button></span>
+      <span className="qty"><button onClick={() => setQty(p, v, n - 1)} aria-label="menos">−</button><b>{n}</b><button onClick={() => setQty(p, v, n + 1)} disabled={n >= avail(p, v)} aria-label="mais">+</button></span>
     );
   };
 
@@ -67,6 +81,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
       <div className="grid products">
         {filtered.map((p) => {
           const imgs = [...p.product_images].sort((a, b) => a.position - b.position);
+          const vs = vars(p);
           return (
             <article key={p.id} className="card product">
               <button className="photo" onClick={() => setZoom(p)} aria-label={`Ver ${p.name}`}>
@@ -76,9 +91,12 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
               <div className="body">
                 <strong>{p.name}</strong>
                 {ratings[p.id] && <Stars value={ratings[p.id].avg_rating} count={ratings[p.id].total} />}
-                <span className="price">{p.price != null ? brl(p.price) : "Sob consulta"}</span>
-                {p.track_stock && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5 && <small className="muted">Restam {p.stock}</small>}
-                <Qty p={p} />
+                <span className="price">{priceLabel(p)}</span>
+                {vs.length > 0 && <small className="muted">{vs.length} opções</small>}
+                {!vs.length && p.track_stock && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5 && <small className="muted">Restam {p.stock}</small>}
+                {soldOut(p) ? <span className="muted">Esgotado</span>
+                  : vs.length ? <button className="btn primary sm" onClick={() => setZoom(p)}>Escolher opção</button>
+                  : <Qty p={p} />}
               </div>
             </article>
           );
@@ -91,15 +109,15 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
         <div className="overlay" onClick={() => setOpen(false)}>
           <aside className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="between"><h2>Seu pedido</h2><button className="btn ghost" onClick={() => setOpen(false)}>Fechar</button></div>
-            {lines.map(({ p, n }) => (
-              <div className="line" key={p.id}>
-                <span>{p.name}<br /><small className="muted">{p.price != null ? brl(p.price) : "Sob consulta"}</small></span>
-                <Qty p={p} />
+            {lines.map(({ p, v }) => (
+              <div className="line" key={key(p, v)}>
+                <span>{p.name}{v && <b> · {v.name}</b>}<br /><small className="muted">{priceOf(p, v) != null ? brl(priceOf(p, v)!) : "Sob consulta"}</small></span>
+                <Qty p={p} v={v} />
               </div>
             ))}
             <div className="between total"><span>Total</span><b>{total > 0 ? brl(total) : "—"}</b></div>
             <div className="form">
-              <label>Observações<textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Endereço, forma de pagamento, retirada…" /></label>
+              <label>Observações<textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Forma de pagamento, retirada, horário…" /></label>
             </div>
             {err && <p className="err">{err}</p>}
             {!store.whatsapp ? <p className="err">Esta loja ainda não informou um WhatsApp.</p>
@@ -122,9 +140,21 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
               ))}
             </div>
             <h2>{zoom.name}</h2>
+            {zoom.sku && <small className="muted">SKU {zoom.sku}</small>}
             {ratings[zoom.id] && <Stars value={ratings[zoom.id].avg_rating} count={ratings[zoom.id].total} />}
             {zoom.description && <p>{zoom.description}</p>}
-            <div className="between"><span className="price">{zoom.price != null ? brl(zoom.price) : "Sob consulta"}</span><Qty p={zoom} /></div>
+            {vars(zoom).length ? (
+              <div className="vlist">
+                {vars(zoom).map((v) => (
+                  <div className="line" key={v.id}>
+                    <span><b>{v.name}</b><br /><small className="muted">{priceOf(zoom, v) != null ? brl(priceOf(zoom, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`}{v.stock != null && v.stock > 0 && v.stock <= 5 && ` · restam ${v.stock}`}</small></span>
+                    <Qty p={zoom} v={v} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="between"><span className="price">{priceLabel(zoom)}</span><Qty p={zoom} /></div>
+            )}
             <h3>Avaliações deste produto</h3>
             {!(reviews[zoom.id]?.length) && <p className="muted">Sem avaliações ainda.</p>}
             {(reviews[zoom.id] ?? []).map((v) => (

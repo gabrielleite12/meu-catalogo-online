@@ -8,7 +8,7 @@ export default async function Pedidos({ params }: { params: Promise<{ id: string
   const { id } = await params;
   const supabase = await supabaseServer();
   const { data } = await supabase
-    .from("orders").select("*, order_items(id,name,price,qty)")
+    .from("orders").select("*, order_items(id,name,variant_name,price,qty)")
     .eq("store_id", id).order("created_at", { ascending: false }).limit(100);
   return (
     <>
@@ -24,8 +24,8 @@ export default async function Pedidos({ params }: { params: Promise<{ id: string
             </div>
             <p><b>{o.customer_name}</b> · {o.customer_phone}<br /><span className="muted">{o.customer_address}</span></p>
             <ul className="items">
-              {o.order_items.map((i: { id: string; name: string; price: number | null; qty: number }) => (
-                <li key={i.id}>{i.qty}× {i.name} <span className="muted">{i.price != null ? brl(i.price * i.qty) : "sob consulta"}</span></li>
+              {o.order_items.map((i: { id: string; name: string; variant_name?: string | null; price: number | null; qty: number }) => (
+                <li key={i.id}>{i.qty}× {i.name}{i.variant_name ? ` (${i.variant_name})` : ""} <span className="muted">{i.price != null ? brl(i.price * i.qty) : "sob consulta"}</span></li>
               ))}
             </ul>
             {o.notes && <p className="muted">Obs.: {o.notes}</p>}

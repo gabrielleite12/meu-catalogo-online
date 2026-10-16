@@ -11,10 +11,12 @@ export type Store = {
   category: string | null; whatsapp: string | null; city: string | null;
   payment_methods: string[]; delivery_methods: string[]; published: boolean; logo_url: string | null;
 };
+export type Variant = { id: string; product_id: string; name: string; sku: string | null; price: number | null; stock: number | null; active: boolean; position: number };
 export type Product = {
   id: string; store_id: string; name: string; description: string | null; price: number | null;
   track_stock: boolean; stock: number | null; active: boolean; position: number;
   product_images: { id: string; drive_file_id: string; position: number }[];
+  sku: string | null; product_variants: Variant[];
 };
 
 /** Só aceita caminhos internos para evitar redirecionamento aberto. */
