@@ -1,3 +1,4 @@
+import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { imgUrl, type Store } from "@/lib/utils";
@@ -25,11 +26,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
 
   return (
     <>
-      <header className="top">
-        <Link href="/" className="logo">Expositor</Link>
-        <nav><Link href="/ajuda">Como funciona</Link></nav>
-        {user.user ? <Link className="btn" href="/painel">Meu painel</Link> : <Link className="btn" href="/login">Criar meu catálogo</Link>}
-      </header>
+      <SiteHeader />
       <main className="wrap">
         <section className="hero">
           <h1>Encontre lojas e produtos</h1>

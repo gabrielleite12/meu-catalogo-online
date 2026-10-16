@@ -1,10 +1,10 @@
+import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { brl, safeNext } from "@/lib/utils";
 import ProfileForm from "./ProfileForm";
 import ReviewForm from "./ReviewForm";
 import { reviewStore, reviewProduct } from "./actions";
-import { signOut } from "../painel/actions";
 
 const LABEL: Record<string, string> = { novo: "Aguardando a loja", finalizado: "Finalizado", cancelado: "Cancelado" };
 type Item = { id: string; product_id: string | null; name: string; price: number | null; qty: number };
@@ -26,13 +26,15 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <>
-      <header className="top">
-        <Link href="/" className="logo">Expositor</Link>
-        <nav><Link href="/painel">Meus catálogos</Link></nav>
-        <form action={signOut}><button className="btn ghost">Sair</button></form>
-      </header>
+      <SiteHeader />
       <main className="wrap">
         <h1>Minha conta</h1>
+        <div className="card acct">
+          {(u.user!.user_metadata?.avatar_url ?? u.user!.user_metadata?.picture) && <img src={u.user!.user_metadata.avatar_url ?? u.user!.user_metadata.picture} alt="" referrerPolicy="no-referrer" />}
+          <div><b>{u.user!.user_metadata?.full_name ?? u.user!.email}</b><br /><span className="muted">{u.user!.email} · conectado com Google</span></div>
+          <Link className="btn" href="/painel">Ir para meus catálogos</Link>
+        </div>
+        <h2>Meus dados para pedidos</h2>
         {!profile && <p className="muted">Complete seu cadastro para poder fazer pedidos. Seus dados são enviados apenas às lojas em que você pedir.</p>}
         <ProfileForm profile={profile} next={next ? safeNext(next) : undefined} defaultName={u.user!.user_metadata?.full_name} />
 

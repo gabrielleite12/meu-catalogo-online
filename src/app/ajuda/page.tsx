@@ -1,3 +1,4 @@
+import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 
 export const metadata = { title: "Como usar — Expositor" };
@@ -5,7 +6,7 @@ export const metadata = { title: "Como usar — Expositor" };
 export default function Ajuda() {
   return (
     <>
-      <header className="top"><Link href="/" className="logo">Expositor</Link><nav /><Link className="btn" href="/login?next=/painel">Entrar</Link></header>
+      <SiteHeader />
       <main className="wrap prose">
         <h1>Como usar o Expositor</h1>
         <p className="muted">Guia rápido para quem vai vender e para quem vai comprar.</p>

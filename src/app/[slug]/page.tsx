@@ -1,3 +1,4 @@
+import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -45,7 +46,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   const { store, products } = r;
   return (
     <>
-      <header className="top"><Link href="/" className="logo">Expositor</Link><nav /><Link className="btn" href="/conta">Minha conta</Link></header>
+      <SiteHeader />
       <main className="wrap">
         <section className="storehead">
           <div className="logoBox big">{store.logo_url ? <img src={store.logo_url} alt={`Logo ${store.name}`} /> : <span>{store.name[0]}</span>}</div>

@@ -1,3 +1,4 @@
+import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 
 export const metadata = { title: "Política de Privacidade — Expositor" };
@@ -5,7 +6,7 @@ export const metadata = { title: "Política de Privacidade — Expositor" };
 export default function Privacidade() {
   return (
     <>
-      <header className="top"><Link href="/" className="logo">Expositor</Link><nav /></header>
+      <SiteHeader />
       <main className="wrap prose">
         <h1>Política de Privacidade</h1>
         <p className="muted">Última atualização: 16 de outubro de 2026</p>
