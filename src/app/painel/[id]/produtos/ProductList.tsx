@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 import { bulkProducts, deleteProduct, duplicateProduct, removeImage, updateProduct } from "../../actions";
 import { imgUrl, type Product, type Variant } from "@/lib/utils";
 
@@ -8,11 +8,12 @@ type Row = { name: string; sku: string; price: string; stock: string; id?: strin
 const toRow = (v: Variant): Row => ({ id: v.id, name: v.name, sku: v.sku ?? "", price: v.price != null ? String(v.price).replace(".", ",") : "", stock: v.stock != null ? String(v.stock) : "" });
 const csv = (t: string) => t.split(",").map((x) => x.trim()).filter(Boolean);
 
-function Editor({ p, storeId, rating }: { p: Product; storeId: string; rating?: { avg_rating: number; total: number } }) {
+function Editor({ p, rating }: { p: Product; rating?: { avg_rating: number; total: number } }) {
   const [rows, setRows] = useState<Row[]>([...p.product_variants].sort((a, b) => a.position - b.position).map(toRow));
   const [sizes, setSizes] = useState("");
   const [colors, setColors] = useState("");
   const [track, setTrack] = useState(p.track_stock);
+  const [st, act, saving] = useActionState(updateProduct, {});
   const set = (i: number, k: keyof Row, v: string) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
 
   function generate() {
@@ -24,7 +25,7 @@ function Editor({ p, storeId, rating }: { p: Product; storeId: string; rating?: 
   }
 
   return (
-    <form action={updateProduct} className="form">
+    <form action={act} className="form">
       <input type="hidden" name="id" value={p.id} />
       <input type="hidden" name="variants" value={JSON.stringify(rows)} />
       {rating && <p className="muted">★ {rating.avg_rating} ({rating.total} avaliações)</p>}
@@ -70,10 +71,12 @@ function Editor({ p, storeId, rating }: { p: Product; storeId: string; rating?: 
         {rows.length > 0 && <small className="muted block">Com variações, o estoque é por variação. Deixe vazio para não controlar.</small>}
       </fieldset>
 
+      {st.error && <p className="err">{st.error}</p>}
+      {st.ok && !saving && <p className="ok">✓ Salvo</p>}
       <div className="between">
         <label className="check"><input type="checkbox" name="active" defaultChecked={p.active} /> Visível no catálogo</label>
         <div className="actions">
-          <button type="submit" className="btn primary">Salvar</button>
+          <button type="submit" className="btn primary" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</button>
           <button className="btn" formAction={duplicateProduct} formNoValidate
             onClick={(e) => { if (!confirm(`Criar uma cópia oculta de "${p.name}"?`)) e.preventDefault(); }}>Duplicar</button>
           <button className="btn danger" formAction={deleteProduct} formNoValidate
@@ -154,7 +157,7 @@ export default function ProductList({ products, storeId, ratings }: {
                     ))}
                     <Link className="thumb add" href={`/painel/${storeId}/importar?produto=${p.id}`} title="Adicionar fotos">+</Link>
                   </div>
-                  <Editor p={p} storeId={storeId} rating={ratings[p.id]} />
+                  <Editor p={p} rating={ratings[p.id]} />
                 </div>
               )}
             </div>
