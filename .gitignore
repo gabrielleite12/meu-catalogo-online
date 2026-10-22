@@ -7,3 +7,4 @@ tsconfig.tsbuildinfo
 *.tsbuildinfo
 .vercel
 supabase/.temp
+.qa

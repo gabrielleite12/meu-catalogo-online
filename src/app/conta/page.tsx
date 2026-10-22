@@ -4,7 +4,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { brl, safeNext } from "@/lib/utils";
 import ProfileForm from "./ProfileForm";
 import ReviewForm from "./ReviewForm";
-import { reviewStore, reviewProduct } from "./actions";
+import { reviewStore, reviewProduct, cancelMyOrder } from "./actions";
+import SubmitButton from "@/components/SubmitButton";
 
 const LABEL: Record<string, string> = { novo: "Aguardando a loja", finalizado: "Finalizado", cancelado: "Cancelado" };
 type Item = { id: string; product_id: string | null; name: string; variant_name?: string | null; price: number | null; qty: number };
@@ -62,7 +63,12 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
               {o.status === "finalizado" && !storeDone.has(o.id) && (
                 <ReviewForm action={reviewStore} fields={{ order_id: o.id }} label={`Avaliar a loja ${o.stores.name}`} />
               )}
-              {o.status === "novo" && <p className="muted">Você poderá avaliar a loja e os produtos depois que a loja marcar o pedido como finalizado.</p>}
+              {o.status === "novo" && (
+                <>
+                  <p className="muted">Combine pagamento e entrega pelo WhatsApp. Você poderá avaliar a loja e os produtos depois que ela marcar o pedido como finalizado.</p>
+                  <form action={cancelMyOrder}><input type="hidden" name="id" value={o.id} /><SubmitButton className="btn sm danger" pendingText="Cancelando…">Cancelar pedido</SubmitButton></form>
+                </>
+              )}
             </div>
           ))}
         </div>

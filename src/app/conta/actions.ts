@@ -65,3 +65,9 @@ export async function reviewProduct(_: unknown, fd: FormData): Promise<State> {
   revalidatePath("/conta");
   return { ok: true };
 }
+
+export async function cancelMyOrder(fd: FormData) {
+  const { supabase } = await ctx();
+  await supabase.rpc("cancel_order", { p_order: String(fd.get("id")) });
+  revalidatePath("/conta");
+}

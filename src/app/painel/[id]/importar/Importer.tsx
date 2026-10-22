@@ -97,6 +97,9 @@ export default function Importer({ storeId, products, used, initialProduct }: {
   return (
     <>
       <Script src="https://apis.google.com/js/api.js" onLoad={loadPicker} />
+      {initialProduct && (
+        <div className="card note">📎 Você está adicionando fotos ao produto <b>{products.find((x) => x.id === initialProduct)?.name ?? "selecionado"}</b>. Escolha as fotos e clique em <b>Adicionar</b>. Depois, em Produtos, ligue cada foto à sua variação (cor).</div>
+      )}
       <div className="actions wrapx">
         <button className="btn primary" disabled={!ready || connected === null} onClick={() => openPicker("photos")}>🖼️ Escolher fotos</button>
         <button className="btn" disabled={!ready || connected === null} onClick={() => openPicker("folder")}>📁 Importar pasta inteira</button>

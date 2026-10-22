@@ -236,33 +236,13 @@ export async function removeImage(fd: FormData) {
   refresh();
 }
 
-/** Lojista finaliza (baixa o estoque dos itens controlados) ou cancela o pedido. */
+/** Lojista finaliza ou cancela (cancelar devolve o estoque reservado). */
 export async function setOrderStatus(fd: FormData) {
   const { supabase } = await ctx();
   const id = String(fd.get("id"));
   const status = String(fd.get("status"));
-  if (status !== "finalizado" && status !== "cancelado") return;
-
-  const { data: order } = await supabase.from("orders").select("id,status").eq("id", id).maybeSingle();
-  if (!order || order.status !== "novo") return;
-
-  const { error } = await supabase.from("orders")
-    .update({ status, finished_at: status === "finalizado" ? new Date().toISOString() : null }).eq("id", id);
-  if (error) return;
-
-  if (status === "finalizado") {
-    const { data: items } = await supabase.from("order_items").select("product_id,variant_id,qty").eq("order_id", id);
-    for (const it of items ?? []) {
-      if (it.variant_id) {
-        const { data: v } = await supabase.from("product_variants").select("stock").eq("id", it.variant_id).maybeSingle();
-        if (v && v.stock != null) await supabase.from("product_variants").update({ stock: Math.max(0, v.stock - it.qty) }).eq("id", it.variant_id);
-        continue;
-      }
-      if (!it.product_id) continue;
-      const { data: p } = await supabase.from("products").select("track_stock,stock").eq("id", it.product_id).maybeSingle();
-      if (p?.track_stock) await supabase.from("products").update({ stock: Math.max(0, (p.stock ?? 0) - it.qty) }).eq("id", it.product_id);
-    }
-  }
+  if (status === "finalizado") await supabase.rpc("finalize_order", { p_order: id });
+  else if (status === "cancelado") await supabase.rpc("cancel_order", { p_order: id });
   refresh();
 }
 

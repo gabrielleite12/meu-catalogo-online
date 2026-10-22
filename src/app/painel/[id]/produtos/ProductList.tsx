@@ -139,6 +139,26 @@ function Editor({ p, rating, templates, categories }: {
             </div>
           </div>
         )}
+        {g1.length > 0 && g2.length > 0 && p.product_images.length > 0 && rows.length > 0 && (
+          <div className="colorphotos">
+            <small className="muted block">Foto de cada {(groups[1].name || "cor").toLowerCase()}: vale para todas as variações dela (todos os {(groups[0].name || "tamanhos").toLowerCase()}).</small>
+            {g2.map((l) => {
+              const mine = rows.filter((r) => r.name.toLowerCase().endsWith(` / ${l.toLowerCase()}`));
+              if (!mine.length) return null;
+              const val = mine.every((r) => r.image === mine[0].image) ? mine[0].image : "";
+              return (
+                <label key={l} className="cp">
+                  {val ? <img src={imgUrl(val) + "?s=80"} alt="" /> : <span className="ph" />}
+                  <b>{l}</b>
+                  <select value={val} onChange={(e) => setRows((rs) => rs.map((r) => (r.name.toLowerCase().endsWith(` / ${l.toLowerCase()}`) ? { ...r, image: e.target.value } : r)))}>
+                    <option value="">Sem foto específica</option>
+                    {[...p.product_images].sort((a, b) => a.position - b.position).map((im, k) => <option key={im.id} value={im.drive_file_id}>Foto {k + 1}</option>)}
+                  </select>
+                </label>
+              );
+            })}
+          </div>
+        )}
         {rows.length > 0 && (
           <div className="vtable">
             <div className="vhead"><span>Variação</span><span>SKU</span><span>Cód. barras</span><span>Preço</span><span>Estoque</span><span>Foto</span><span /></div>

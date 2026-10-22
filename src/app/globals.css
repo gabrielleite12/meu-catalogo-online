@@ -147,3 +147,4 @@ input[type=checkbox]{width:auto}
 .vhead,.vrow{grid-template-columns:1.3fr .9fr .9fr .8fr .8fr 120px 28px!important;min-width:760px!important}
 .vimg{display:flex;gap:6px;align-items:center}.vimg img{width:32px;height:32px;object-fit:cover;border-radius:6px}.vimg select{padding:6px}
 .vthumb{all:unset;cursor:pointer;width:44px;height:44px;border-radius:8px;overflow:hidden;flex:none;border:1px solid var(--line)}.vthumb img{width:100%;height:100%;object-fit:cover}.vlist .line span{flex:1}
+.colorphotos{display:grid;gap:6px}.cp{display:flex;align-items:center;gap:10px}.cp img,.cp .ph{width:36px;height:36px;border-radius:8px;object-fit:cover;background:var(--soft);flex:none}.cp b{min-width:90px}.cp select{max-width:220px;padding:6px}
