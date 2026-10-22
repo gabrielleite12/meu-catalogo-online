@@ -23,6 +23,8 @@ export default function Importer({ storeId, products, used, initialProduct }: {
   const [err, setErr] = useState("");
   const [sel, setSel] = useState<Map<string, string>>(new Map());
   const [groupName, setGroupName] = useState("");
+  const [category, setCategory] = useState("");
+  const [tags, setTags] = useState("");
   const [target, setTarget] = useState(initialProduct ?? "");
   const [pending, start] = useTransition();
   const here = typeof location === "undefined" ? "/painel" : location.pathname;
@@ -77,7 +79,7 @@ export default function Importer({ storeId, products, used, initialProduct }: {
   const drop = (id: string) => setSel((m) => { const n = new Map(m); n.delete(id); return n; });
   const run = (mode: "each" | "group" | "add") =>
     start(async () => {
-      const r = await importFiles({ storeId, mode, files, groupName, productId: target });
+      const r = await importFiles({ storeId, mode, files, groupName, productId: target, category, tags });
       if (r.error) return setErr(r.error);
       router.push(`/painel/${storeId}/produtos`);
     });
@@ -104,6 +106,10 @@ export default function Importer({ storeId, products, used, initialProduct }: {
       {info && <p className="ok">{info}</p>}
       {err && <p className="err">{err}</p>}
 
+      <div className="row2 applyall">
+        <label>Categoria dos novos produtos <small>(opcional)</small><input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex.: Calçados" /></label>
+        <label>Tags dos novos produtos <small>(opcional)</small><input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Masculino, Tênis, Nike" /></label>
+      </div>
       <div className="grid pick">
         {files.map((f) => (
           <button key={f.id} className="tile on" onClick={() => drop(f.id)} title="Clique para remover da seleção">

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
 import { nameFromFile } from "@/lib/google";
-import { slugify } from "@/lib/utils";
+import { slugify, csvList } from "@/lib/utils";
 
 async function ctx() {
   const supabase = await supabaseServer();
@@ -58,7 +58,7 @@ export async function deleteStore(fd: FormData) {
 type FileRef = { id: string; name: string };
 
 /** mode: each = um produto por foto · group = várias fotos num produto · add = fotos em produto existente */
-export async function importFiles(input: { storeId: string; mode: "each" | "group" | "add"; files: FileRef[]; groupName?: string; productId?: string }) {
+export async function importFiles(input: { storeId: string; mode: "each" | "group" | "add"; files: FileRef[]; groupName?: string; productId?: string; category?: string; tags?: string }) {
   const { supabase } = await ctx();
   if (!input.files.length) return { error: "Selecione ao menos uma foto." };
   const { data: store } = await supabase.from("stores").select("id").eq("id", input.storeId).maybeSingle();
@@ -76,8 +76,10 @@ export async function importFiles(input: { storeId: string; mode: "each" | "grou
     if (error) return { error: error.message };
   } else {
     const groups: FileRef[][] = input.mode === "each" ? input.files.map((f) => [f]) : [input.files];
+    const cat = input.category?.trim() || null;
+    const tags = csvList(input.tags ?? "");
     const rows = groups.map((g, i) => ({
-      store_id: store.id, position: pos + i,
+      store_id: store.id, position: pos + i, category: cat, tags,
       name: input.mode === "group" && input.groupName?.trim() ? input.groupName.trim() : nameFromFile(g[0].name),
     }));
     // inserção em lote: uma consulta para os produtos e outra para as fotos
@@ -92,7 +94,7 @@ export async function importFiles(input: { storeId: string; mode: "each" | "grou
   return { ok: true };
 }
 
-type VariantInput = { id?: string; name: string; sku?: string; price?: string | number | null; stock?: string | number | null };
+type VariantInput = { id?: string; name: string; sku?: string; barcode?: string; price?: string | number | null; stock?: string | number | null };
 // "1.299,90" -> 1299.9 · "199.9" -> 199.9 · "199,9" -> 199.9
 const num = (v: unknown) => {
   let t = String(v ?? "").trim();
@@ -111,6 +113,12 @@ export async function updateProduct(_: unknown, fd: FormData): Promise<{ ok?: bo
   const { error: eUp } = await supabase.from("products").update({
     name: String(fd.get("name") ?? "").trim() || "Sem nome",
     sku: String(fd.get("sku") ?? "").trim() || null,
+    barcode: String(fd.get("barcode") ?? "").trim() || null,
+    category: String(fd.get("category") ?? "").trim() || null,
+    tags: list(fd.get("tags")),
+    low_stock_alert: (() => { const n = num(fd.get("low_stock_alert")); return n == null ? null : Math.max(0, Math.floor(n)); })(),
+    hide_when_out: fd.get("hide_when_out") === "on",
+    auto_hidden: false,
     description: String(fd.get("description") ?? "").trim() || null,
     price: num(fd.get("price")),
     track_stock: variants.length ? false : track,
@@ -129,7 +137,7 @@ export async function updateProduct(_: unknown, fd: FormData): Promise<{ ok?: bo
   }
   for (const [position, v] of variants.entries()) {
     const stock = num(v.stock);
-    const row = { name: v.name.trim(), sku: v.sku?.trim() || null, price: num(v.price), stock: stock == null ? null : Math.max(0, Math.floor(stock)), position };
+    const row = { name: v.name.trim(), sku: v.sku?.trim() || null, barcode: v.barcode?.trim() || null, price: num(v.price), stock: stock == null ? null : Math.max(0, Math.floor(stock)), position };
     const { error } = v.id
       ? await supabase.from("product_variants").update(row).eq("id", v.id)
       : await supabase.from("product_variants").insert({ ...row, product_id: id });
@@ -139,22 +147,49 @@ export async function updateProduct(_: unknown, fd: FormData): Promise<{ ok?: bo
   return { ok: true };
 }
 
-export async function bulkProducts(input: { ids: string[]; action: "delete" | "hide" | "show" }) {
+export async function bulkProducts(input: { ids: string[]; action: "delete" | "hide" | "show" | "category" | "tags_add"; value?: string }) {
   const { supabase } = await ctx();
   if (!input.ids.length) return;
   if (input.action === "delete") await supabase.from("products").delete().in("id", input.ids);
-  else await supabase.from("products").update({ active: input.action === "show" }).in("id", input.ids);
+  else if (input.action === "category") await supabase.from("products").update({ category: (input.value ?? "").trim() || null }).in("id", input.ids);
+  else if (input.action === "tags_add") {
+    const add = csvList(input.value ?? "");
+    const { data } = await supabase.from("products").select("id,tags").in("id", input.ids);
+    for (const p of data ?? []) await supabase.from("products").update({ tags: [...new Set([...(p.tags ?? []), ...add])] }).eq("id", p.id);
+  } else await supabase.from("products").update({ active: input.action === "show", auto_hidden: false }).in("id", input.ids);
+  refresh();
+}
+
+export async function toggleProduct(fd: FormData) {
+  const { supabase } = await ctx();
+  await supabase.from("products").update({ active: fd.get("active") === "true", auto_hidden: false }).eq("id", String(fd.get("id")));
+  refresh();
+}
+
+export async function saveTemplate(fd: FormData) {
+  const { supabase } = await ctx();
+  const name = String(fd.get("name") ?? "").trim();
+  const options = csvList(String(fd.get("options") ?? ""));
+  if (!name || !options.length) return;
+  await supabase.from("variation_templates").insert({ store_id: String(fd.get("store_id")), name, options });
+  refresh();
+}
+
+export async function deleteTemplate(fd: FormData) {
+  const { supabase } = await ctx();
+  await supabase.from("variation_templates").delete().eq("id", String(fd.get("id")));
   refresh();
 }
 
 export async function duplicateProduct(fd: FormData) {
   const { supabase } = await ctx();
   const { data: p } = await supabase.from("products")
-    .select("*, product_images(drive_file_id,position), product_variants(name,sku,price,stock,position)").eq("id", String(fd.get("id"))).single();
+    .select("*, product_images(drive_file_id,position), product_variants(name,sku,barcode,price,stock,position)").eq("id", String(fd.get("id"))).single();
   if (!p) return;
   const { data: copy } = await supabase.from("products").insert({
     store_id: p.store_id, name: `${p.name} (cópia)`, sku: null, description: p.description, price: p.price,
     track_stock: p.track_stock, stock: p.stock, active: false, position: p.position + 1,
+    category: p.category, tags: p.tags, low_stock_alert: p.low_stock_alert, hide_when_out: p.hide_when_out,
   }).select("id").single();
   if (!copy) return;
   if (p.product_images.length) await supabase.from("product_images").insert(p.product_images.map((i: object) => ({ ...i, product_id: copy.id })));

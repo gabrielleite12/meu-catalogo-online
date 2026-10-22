@@ -34,6 +34,10 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [zoom, setZoom] = useState<Product | null>(null);
+  const [cat, setCat] = useState("");
+  const [tag, setTag] = useState("");
+  const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean) as string[])].sort(), [products]);
+  const tags = useMemo(() => [...new Set(products.flatMap((p) => p.tags))].sort(), [products]);
 
   useEffect(() => { try { setCart(JSON.parse(localStorage.getItem(storageKey) || "{}")); } catch {} }, [storageKey]);
   useEffect(() => { try { localStorage.setItem(storageKey, JSON.stringify(cart)); } catch {} }, [cart, storageKey]);
@@ -52,7 +56,8 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
   }, [cart, products]);
   const count = lines.reduce((a, l) => a + l.n, 0);
   const total = lines.reduce((a, l) => a + (priceOf(l.p, l.v) ?? 0) * l.n, 0);
-  const filtered = products.filter((p) => norm(p.name + " " + (p.sku ?? "")).includes(norm(q)));
+  const filtered = products.filter((p) =>
+    norm([p.name, p.sku, p.category, ...p.tags].filter(Boolean).join(" ")).includes(norm(q)) && (!cat || p.category === cat) && (!tag || p.tags.includes(tag)));
 
   async function send() {
     setErr(""); setSending(true);
@@ -77,6 +82,16 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
   return (
     <>
       <input className="filter" placeholder="Buscar nos produtos desta loja…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {(categories.length > 0 || tags.length > 0) && (
+        <div className="chipbar shopfilters">
+          {categories.length > 0 && <>
+            <button className={"fchip" + (!cat ? " on" : "")} onClick={() => setCat("")}>Tudo</button>
+            {categories.map((c) => <button key={c} className={"fchip" + (cat === c ? " on" : "")} onClick={() => setCat(cat === c ? "" : c)}>{c}</button>)}
+          </>}
+          {tags.length > 0 && <span className="sep" />}
+          {tags.map((t) => <button key={t} className={"fchip tag" + (tag === t ? " on" : "")} onClick={() => setTag(tag === t ? "" : t)}>#{t}</button>)}
+        </div>
+      )}
       {!filtered.length && <p className="muted center-text">Nenhum produto encontrado.</p>}
       <div className="grid products">
         {filtered.map((p) => {
@@ -93,7 +108,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
                 {ratings[p.id] && <Stars value={ratings[p.id].avg_rating} count={ratings[p.id].total} />}
                 <span className="price">{priceLabel(p)}</span>
                 {vs.length > 0 && <small className="muted">{vs.length} opções</small>}
-                {!vs.length && p.track_stock && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5 && <small className="muted">Restam {p.stock}</small>}
+                {!vs.length && p.track_stock && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= (p.low_stock_alert ?? 5) && <small className="muted">Restam {p.stock}</small>}
                 {soldOut(p) ? <span className="muted">Esgotado</span>
                   : vs.length ? <button className="btn primary sm" onClick={() => setZoom(p)}>Escolher opção</button>
                   : <Qty p={p} />}
@@ -140,6 +155,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
               ))}
             </div>
             <h2>{zoom.name}</h2>
+            {(zoom.category || zoom.tags.length > 0) && <div className="chips">{zoom.category && <span className="chip">{zoom.category}</span>}{zoom.tags.map((t) => <span className="chip" key={t}>#{t}</span>)}</div>}
             {zoom.sku && <small className="muted">SKU {zoom.sku}</small>}
             {ratings[zoom.id] && <Stars value={ratings[zoom.id].avg_rating} count={ratings[zoom.id].total} />}
             {zoom.description && <p>{zoom.description}</p>}
@@ -147,7 +163,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
               <div className="vlist">
                 {vars(zoom).map((v) => (
                   <div className="line" key={v.id}>
-                    <span><b>{v.name}</b><br /><small className="muted">{priceOf(zoom, v) != null ? brl(priceOf(zoom, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`}{v.stock != null && v.stock > 0 && v.stock <= 5 && ` · restam ${v.stock}`}</small></span>
+                    <span><b>{v.name}</b><br /><small className="muted">{priceOf(zoom, v) != null ? brl(priceOf(zoom, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`}{v.stock != null && v.stock > 0 && v.stock <= (zoom.low_stock_alert ?? 5) && ` · restam ${v.stock}`}</small></span>
                     <Qty p={zoom} v={v} />
                   </div>
                 ))}
