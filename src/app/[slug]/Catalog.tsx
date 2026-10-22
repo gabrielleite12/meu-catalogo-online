@@ -108,7 +108,16 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
                 <strong>{p.name}</strong>
                 {ratings[p.id] && <Stars value={ratings[p.id].avg_rating} count={ratings[p.id].total} />}
                 <span className="price">{priceLabel(p)}</span>
-                {vs.length > 0 && <small className="muted">{vs.length} opções</small>}
+                {vs.length > 0 && (
+                  <div className="vchips" aria-label="Opções disponíveis">
+                    {vs.slice(0, 6).map((v) => (
+                      <span key={v.id} className={"vchip" + (avail(p, v) <= 0 ? " out" : "")}>
+                        {v.name}{v.stock != null && <b>{v.stock > 0 ? ` · ${v.stock}` : " · esgotado"}</b>}
+                      </span>
+                    ))}
+                    {vs.length > 6 && <span className="vchip more">+{vs.length - 6}</span>}
+                  </div>
+                )}
                 {!vs.length && p.track_stock && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= (p.low_stock_alert ?? 5) && <small className="muted">Restam {p.stock}</small>}
                 {soldOut(p) ? <span className="muted">Esgotado</span>
                   : vs.length ? <button className="btn primary sm" onClick={() => { setHero(null); setZoom(p); }}>Escolher opção</button>
@@ -165,7 +174,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
                 {vars(zoom).map((v) => (
                   <div className="line" key={v.id}>
                     {v.image_file_id && <button className="vthumb" onClick={() => setHero(v.image_file_id)} aria-label={`Ver foto ${v.name}`}><img src={imgUrl(v.image_file_id) + "?s=120"} alt="" /></button>}
-                    <span onClick={() => v.image_file_id && setHero(v.image_file_id)}><b>{v.name}</b><br /><small className="muted">{priceOf(zoom, v) != null ? brl(priceOf(zoom, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`}{v.stock != null && v.stock > 0 && v.stock <= (zoom.low_stock_alert ?? 5) && ` · restam ${v.stock}`}</small></span>
+                    <span onClick={() => v.image_file_id && setHero(v.image_file_id)}><b>{v.name}</b><br /><small className="muted">{priceOf(zoom, v) != null ? brl(priceOf(zoom, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`}{v.stock != null && (v.stock > 0 ? ` · ${v.stock} em estoque` : " · esgotado")}</small></span>
                     <Qty p={zoom} v={v} />
                   </div>
                 ))}

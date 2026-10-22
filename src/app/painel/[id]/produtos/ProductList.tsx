@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { bulkProducts, copyVariants, mergeProducts, deleteProduct, duplicateProduct, removeImage, toggleProduct, updateProduct } from "../../actions";
 import { csvList, imgUrl, type Product, type Template, type Variant } from "@/lib/utils";
 import SubmitButton from "@/components/SubmitButton";
@@ -34,6 +34,13 @@ function Editor({ p, rating, templates, categories }: {
   useEffect(() => { try { const g = JSON.parse(localStorage.getItem(gKey) || "null"); if (Array.isArray(g) && g.length) setGroups(g); } catch {} }, [gKey]);
   useEffect(() => { try { localStorage.setItem(gKey, JSON.stringify(groups)); } catch {} }, [groups, gKey]);
   const [st, act, saving] = useActionState(updateProduct, {});
+  const strip = (r: Row[]) => JSON.stringify(r.map(({ id: _id, ...rest }) => rest));
+  const saved = useMemo(() => [...p.product_variants].sort((a, b) => a.position - b.position).map(toRow), [p.product_variants]);
+  const dirty = strip(rows) !== strip(saved);
+  // depois de salvar, recarrega as linhas do servidor (com os ids novos)
+  const sync = useRef(false);
+  useEffect(() => { if (st.ok) sync.current = true; }, [st]);
+  useEffect(() => { if (sync.current) { sync.current = false; setRows(saved); } }, [saved]);
   const [busy, setBusy] = useState<"" | "dup" | "del">("");
   const set = (i: number, k: keyof Row, v: string) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const setG = (i: number, k: keyof Group, v: string) => setGroups((g) => g.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
@@ -185,8 +192,9 @@ function Editor({ p, rating, templates, categories }: {
         <small className="muted block">Os atributos acima ficam salvos para os próximos produtos: você não precisa digitar de novo.</small>
       </fieldset>
 
+      {dirty && !saving && <p className="warn">⚠ Você alterou as variações e ainda não salvou. Clique em <b>Salvar</b> para elas aparecerem no catálogo.</p>}
       {st.error && <p className="err">{st.error}</p>}
-      {st.ok && !saving && <p className="ok">✓ Salvo</p>}
+      {st.ok && !saving && !dirty && <p className="ok">✓ Salvo</p>}
       {p.auto_hidden && <p className="muted">⚠ Este produto foi ocultado automaticamente por falta de estoque.</p>}
       <div className="between">
         <label className="check"><input type="checkbox" name="active" defaultChecked={p.active} /> Visível no catálogo</label>
