@@ -11,7 +11,7 @@ export type Store = {
   category: string | null; whatsapp: string | null; city: string | null;
   payment_methods: string[]; delivery_methods: string[]; published: boolean; logo_url: string | null;
 };
-export type Variant = { id: string; product_id: string; name: string; sku: string | null; price: number | null; stock: number | null; active: boolean; position: number; barcode: string | null };
+export type Variant = { id: string; product_id: string; name: string; sku: string | null; price: number | null; stock: number | null; active: boolean; position: number; barcode: string | null; image_file_id: string | null };
 export type Template = { id: string; store_id: string | null; name: string; options: string[] };
 export type Product = {
   id: string; store_id: string; name: string; description: string | null; price: number | null;

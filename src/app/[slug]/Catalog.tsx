@@ -34,6 +34,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [zoom, setZoom] = useState<Product | null>(null);
+  const [hero, setHero] = useState<string | null>(null);
   const [cat, setCat] = useState("");
   const [tag, setTag] = useState("");
   const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean) as string[])].sort(), [products]);
@@ -99,7 +100,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
           const vs = vars(p);
           return (
             <article key={p.id} className="card product">
-              <button className="photo" onClick={() => setZoom(p)} aria-label={`Ver ${p.name}`}>
+              <button className="photo" onClick={() => { setHero(null); setZoom(p); }} aria-label={`Ver ${p.name}`}>
                 {imgs[0] ? <img src={imgUrl(imgs[0].drive_file_id) + "?s=600"} alt={p.name} loading="lazy" /> : <span />}
                 {imgs.length > 1 && <span className="badge">{imgs.length} fotos</span>}
               </button>
@@ -110,7 +111,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
                 {vs.length > 0 && <small className="muted">{vs.length} opções</small>}
                 {!vs.length && p.track_stock && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= (p.low_stock_alert ?? 5) && <small className="muted">Restam {p.stock}</small>}
                 {soldOut(p) ? <span className="muted">Esgotado</span>
-                  : vs.length ? <button className="btn primary sm" onClick={() => setZoom(p)}>Escolher opção</button>
+                  : vs.length ? <button className="btn primary sm" onClick={() => { setHero(null); setZoom(p); }}>Escolher opção</button>
                   : <Qty p={p} />}
               </div>
             </article>
@@ -150,7 +151,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
           <div className="lightbox" onClick={(e) => e.stopPropagation()}>
             <button className="btn ghost close" onClick={() => setZoom(null)}>Fechar</button>
             <div className="gallery">
-              {[...zoom.product_images].sort((a, b) => a.position - b.position).map((im) => (
+              {[...zoom.product_images].sort((a, b) => (hero ? Number(b.drive_file_id === hero) - Number(a.drive_file_id === hero) : 0) || a.position - b.position).map((im) => (
                 <img key={im.id} src={imgUrl(im.drive_file_id) + "?s=1200"} alt={zoom.name} />
               ))}
             </div>
@@ -163,7 +164,8 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
               <div className="vlist">
                 {vars(zoom).map((v) => (
                   <div className="line" key={v.id}>
-                    <span><b>{v.name}</b><br /><small className="muted">{priceOf(zoom, v) != null ? brl(priceOf(zoom, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`}{v.stock != null && v.stock > 0 && v.stock <= (zoom.low_stock_alert ?? 5) && ` · restam ${v.stock}`}</small></span>
+                    {v.image_file_id && <button className="vthumb" onClick={() => setHero(v.image_file_id)} aria-label={`Ver foto ${v.name}`}><img src={imgUrl(v.image_file_id) + "?s=120"} alt="" /></button>}
+                    <span onClick={() => v.image_file_id && setHero(v.image_file_id)}><b>{v.name}</b><br /><small className="muted">{priceOf(zoom, v) != null ? brl(priceOf(zoom, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`}{v.stock != null && v.stock > 0 && v.stock <= (zoom.low_stock_alert ?? 5) && ` · restam ${v.stock}`}</small></span>
                     <Qty p={zoom} v={v} />
                   </div>
                 ))}

@@ -24,6 +24,7 @@ export default function Ajuda() {
             </ul>
           </li>
           <li><b>Ajuste os produtos.</b> Na aba <i>Produtos</i> mude nome, descrição e preço (opcional). Se quiser, marque <i>Controlar estoque</i> e informe a quantidade. Você também pode ocultar ou excluir produtos.</li>
+          <li><b>Variações (tamanho, cor).</b> Um produto só, várias combinações: em <i>Produtos</i>, abra o item, escolha um modelo (Tamanho, Cor…) ou digite as opções e preencha a <b>grade de estoque</b> — deixe vazio onde a combinação não existe (ex.: só há “M preta”). Cada variação pode ter SKU, preço, código de barras e a <b>foto da sua cor</b>. Os atributos ficam salvos para os próximos produtos. Criou um produto por foto sem querer? Marque-os e use <i>Juntar em um produto</i>, ou <i>Copiar variações do 1º</i> para reaproveitar a mesma grade.</li>
           <li><b>Divulgue.</b> Envie o link <code>…/seu-endereço</code> aos clientes. Seu catálogo também aparece na busca da página inicial.</li>
           <li><b>Atenda os pedidos.</b> O cliente envia o pedido pelo WhatsApp e ele fica registrado em <i>Pedidos</i>. Combine pagamento e entrega com ele e, quando concluir, clique em <i>Marcar como finalizado</i>. O estoque é baixado e o cliente passa a poder avaliar sua loja e os produtos.</li>
         </ol>

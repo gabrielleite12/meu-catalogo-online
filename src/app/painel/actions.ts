@@ -94,7 +94,7 @@ export async function importFiles(input: { storeId: string; mode: "each" | "grou
   return { ok: true };
 }
 
-type VariantInput = { id?: string; name: string; sku?: string; barcode?: string; price?: string | number | null; stock?: string | number | null };
+type VariantInput = { id?: string; name: string; sku?: string; barcode?: string; image?: string; price?: string | number | null; stock?: string | number | null };
 // "1.299,90" -> 1299.9 · "199.9" -> 199.9 · "199,9" -> 199.9
 const num = (v: unknown) => {
   let t = String(v ?? "").trim();
@@ -137,7 +137,7 @@ export async function updateProduct(_: unknown, fd: FormData): Promise<{ ok?: bo
   }
   for (const [position, v] of variants.entries()) {
     const stock = num(v.stock);
-    const row = { name: v.name.trim(), sku: v.sku?.trim() || null, barcode: v.barcode?.trim() || null, price: num(v.price), stock: stock == null ? null : Math.max(0, Math.floor(stock)), position };
+    const row = { name: v.name.trim(), sku: v.sku?.trim() || null, barcode: v.barcode?.trim() || null, image_file_id: v.image?.trim() || null, price: num(v.price), stock: stock == null ? null : Math.max(0, Math.floor(stock)), position };
     const { error } = v.id
       ? await supabase.from("product_variants").update(row).eq("id", v.id)
       : await supabase.from("product_variants").insert({ ...row, product_id: id });
@@ -158,6 +158,33 @@ export async function bulkProducts(input: { ids: string[]; action: "delete" | "h
     for (const p of data ?? []) await supabase.from("products").update({ tags: [...new Set([...(p.tags ?? []), ...add])] }).eq("id", p.id);
   } else await supabase.from("products").update({ active: input.action === "show", auto_hidden: false }).in("id", input.ids);
   refresh();
+}
+
+/** Junta vários produtos em um só: as fotos dos demais vão para o primeiro, e os demais são removidos. */
+export async function mergeProducts(input: { ids: string[] }) {
+  const { supabase } = await ctx();
+  const [main, ...rest] = input.ids;
+  if (!main || !rest.length) return { error: "Selecione ao menos 2 produtos." };
+  const { count } = await supabase.from("product_images").select("id", { count: "exact", head: true }).eq("product_id", main);
+  const { data: imgs } = await supabase.from("product_images").select("id,product_id,position").in("product_id", rest).order("position");
+  let pos = count ?? 0;
+  for (const im of imgs ?? []) await supabase.from("product_images").update({ product_id: main, position: pos++ }).eq("id", im.id);
+  await supabase.from("products").delete().in("id", rest);
+  refresh();
+  return { ok: true };
+}
+
+/** Copia a estrutura de variações (nomes) de um produto para outros, sem copiar estoque. */
+export async function copyVariants(input: { sourceId: string; targetIds: string[] }) {
+  const { supabase } = await ctx();
+  const { data: src } = await supabase.from("product_variants").select("name,position").eq("product_id", input.sourceId).order("position");
+  if (!src?.length) return { error: "O produto de origem não tem variações." };
+  for (const t of input.targetIds.filter((x) => x !== input.sourceId)) {
+    await supabase.from("product_variants").delete().eq("product_id", t);
+    await supabase.from("product_variants").insert(src.map((v) => ({ product_id: t, name: v.name, position: v.position })));
+  }
+  refresh();
+  return { ok: true };
 }
 
 export async function toggleProduct(fd: FormData) {
@@ -184,7 +211,7 @@ export async function deleteTemplate(fd: FormData) {
 export async function duplicateProduct(fd: FormData) {
   const { supabase } = await ctx();
   const { data: p } = await supabase.from("products")
-    .select("*, product_images(drive_file_id,position), product_variants(name,sku,barcode,price,stock,position)").eq("id", String(fd.get("id"))).single();
+    .select("*, product_images(drive_file_id,position), product_variants(name,sku,barcode,price,stock,position,image_file_id)").eq("id", String(fd.get("id"))).single();
   if (!p) return;
   const { data: copy } = await supabase.from("products").insert({
     store_id: p.store_id, name: `${p.name} (cópia)`, sku: null, description: p.description, price: p.price,

@@ -1,14 +1,14 @@
 "use client";
 import Link from "next/link";
-import { useActionState, useMemo, useState, useTransition } from "react";
-import { bulkProducts, deleteProduct, duplicateProduct, removeImage, toggleProduct, updateProduct } from "../../actions";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { bulkProducts, copyVariants, mergeProducts, deleteProduct, duplicateProduct, removeImage, toggleProduct, updateProduct } from "../../actions";
 import { csvList, imgUrl, type Product, type Template, type Variant } from "@/lib/utils";
 import SubmitButton from "@/components/SubmitButton";
 
-type Row = { name: string; sku: string; barcode: string; price: string; stock: string; id?: string };
+type Row = { name: string; sku: string; barcode: string; price: string; stock: string; image: string; id?: string };
 type Group = { name: string; options: string };
-const blank = (name = ""): Row => ({ name, sku: "", barcode: "", price: "", stock: "" });
-const toRow = (v: Variant): Row => ({ id: v.id, name: v.name, sku: v.sku ?? "", barcode: v.barcode ?? "", price: v.price != null ? String(v.price).replace(".", ",") : "", stock: v.stock != null ? String(v.stock) : "" });
+const blank = (name = ""): Row => ({ name, sku: "", barcode: "", price: "", stock: "", image: "" });
+const toRow = (v: Variant): Row => ({ id: v.id, name: v.name, sku: v.sku ?? "", barcode: v.barcode ?? "", price: v.price != null ? String(v.price).replace(".", ",") : "", stock: v.stock != null ? String(v.stock) : "", image: v.image_file_id ?? "" });
 const SUGGEST_TAGS = ["Masculino", "Feminino", "Unissex", "Infantil", "Promoção", "Novidade"];
 
 /** Estoque total e situação do produto (considera variações). */
@@ -30,6 +30,9 @@ function Editor({ p, rating, templates, categories }: {
   const [rows, setRows] = useState<Row[]>([...p.product_variants].sort((a, b) => a.position - b.position).map(toRow));
   const [groups, setGroups] = useState<Group[]>([{ name: "Tamanho", options: "" }, { name: "Cor", options: "" }]);
   const [track, setTrack] = useState(p.track_stock);
+  const gKey = `vgroups:${p.store_id}`;
+  useEffect(() => { try { const g = JSON.parse(localStorage.getItem(gKey) || "null"); if (Array.isArray(g) && g.length) setGroups(g); } catch {} }, [gKey]);
+  useEffect(() => { try { localStorage.setItem(gKey, JSON.stringify(groups)); } catch {} }, [groups, gKey]);
   const [st, act, saving] = useActionState(updateProduct, {});
   const [busy, setBusy] = useState<"" | "dup" | "del">("");
   const set = (i: number, k: keyof Row, v: string) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
@@ -41,7 +44,24 @@ function Editor({ p, rating, templates, categories }: {
     const combos = lists.reduce<string[][]>((acc, l) => acc.flatMap((a) => l.map((o) => [...a, o])), [[]]).map((c) => c.join(" / "));
     const have = new Set(rows.map((r) => r.name.toLowerCase()));
     setRows((r) => [...r, ...combos.filter((n) => !have.has(n.toLowerCase())).map((n) => blank(n))]);
-    setGroups((g) => g.map((x) => ({ ...x, options: "" })));
+  }
+
+  // Grade: colunas = 1º atributo (ex.: tamanho), linhas = 2º atributo (ex.: cor). Célula vazia = combinação não existe.
+  const g1 = csvList(groups[0]?.options ?? "");
+  const g2 = csvList(groups[1]?.options ?? "");
+  const cols = g1.length ? g1 : g2;
+  const lines = g1.length && g2.length ? g2 : [""];
+  const comboName = (c: string, l: string) => (g1.length && g2.length ? `${c} / ${l}` : c);
+  const cell = (name: string) => { const r = rows.find((x) => x.name.toLowerCase() === name.toLowerCase()); return r ? (r.stock === "" ? "∞" : r.stock) : ""; };
+  function setCell(name: string, v: string) {
+    const t = v.trim();
+    setRows((rs) => {
+      const i = rs.findIndex((x) => x.name.toLowerCase() === name.toLowerCase());
+      if (t === "") return i >= 0 ? rs.filter((_, j) => j !== i) : rs;
+      const stock = /^\d+$/.test(t) ? t : "";
+      if (i >= 0) return rs.map((x, j) => (j === i ? { ...x, stock } : x));
+      return [...rs, { ...blank(name), stock }];
+    });
   }
 
   return (
@@ -99,12 +119,29 @@ function Editor({ p, rating, templates, categories }: {
           ))}
           <div className="actions wrapx">
             <button type="button" className="link" onClick={() => setGroups((g) => [...g, { name: "", options: "" }])}>+ Atributo</button>
-            <button type="button" className="btn sm" onClick={generate} disabled={!groups.some((g) => g.options.trim())}>Gerar combinações</button>
+            <button type="button" className="btn sm" onClick={generate} disabled={!groups.some((g) => g.options.trim())} title="Cria todas as combinações de uma vez">Criar todas as combinações</button>
           </div>
         </div>
+        {cols.length > 0 && (
+          <div className="matrix">
+            <small className="muted block">Grade de estoque: digite a quantidade de cada combinação. <b>Deixe vazio se a combinação não existe</b> (ex.: só há M preta). Use ∞ para “existe, sem controle de estoque”.</small>
+            <div className="mscroll">
+              <table>
+                <thead><tr><th>{g1.length && g2.length ? `${groups[1].name || "Linha"} \\ ${groups[0].name || "Coluna"}` : groups[0]?.name || ""}</th>{cols.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+                <tbody>
+                  {lines.map((l) => (
+                    <tr key={l}><th>{l}</th>
+                      {cols.map((c) => { const n = comboName(c, l); return <td key={c}><input value={cell(n)} onChange={(e) => setCell(n, e.target.value)} inputMode="numeric" placeholder="—" /></td>; })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         {rows.length > 0 && (
           <div className="vtable">
-            <div className="vhead"><span>Variação</span><span>SKU</span><span>Cód. barras</span><span>Preço</span><span>Estoque</span><span /></div>
+            <div className="vhead"><span>Variação</span><span>SKU</span><span>Cód. barras</span><span>Preço</span><span>Estoque</span><span>Foto</span><span /></div>
             {rows.map((r, i) => (
               <div className="vrow" key={r.id ?? i}>
                 <input value={r.name} onChange={(e) => set(i, "name", e.target.value)} placeholder="M / Azul" />
@@ -112,12 +149,20 @@ function Editor({ p, rating, templates, categories }: {
                 <input value={r.barcode} onChange={(e) => set(i, "barcode", e.target.value)} placeholder="EAN" inputMode="numeric" />
                 <input value={r.price} onChange={(e) => set(i, "price", e.target.value)} placeholder="= produto" inputMode="decimal" />
                 <input value={r.stock} onChange={(e) => set(i, "stock", e.target.value)} placeholder="sem controle" inputMode="numeric" />
+                <span className="vimg">
+                  {r.image && <img src={imgUrl(r.image) + "?s=80"} alt="" />}
+                  <select value={r.image} onChange={(e) => set(i, "image", e.target.value)} aria-label="Foto da variação">
+                    <option value="">—</option>
+                    {[...p.product_images].sort((a, b) => a.position - b.position).map((im, k) => <option key={im.id} value={im.drive_file_id}>Foto {k + 1}</option>)}
+                  </select>
+                </span>
                 <button type="button" className="x" onClick={() => setRows((a) => a.filter((_, j) => j !== i))} aria-label="Remover variação">×</button>
               </div>
             ))}
           </div>
         )}
         <button type="button" className="link" onClick={() => setRows((r) => [...r, blank()])}>+ Adicionar variação manualmente</button>
+        <small className="muted block">Os atributos acima ficam salvos para os próximos produtos: você não precisa digitar de novo.</small>
       </fieldset>
 
       {st.error && <p className="err">{st.error}</p>}
@@ -178,6 +223,20 @@ export default function ProductList({ products, storeId, ratings, templates }: {
     start(async () => { await bulkProducts({ ids: [...sel], action, value }); setSel(new Set()); setBulkVal(""); });
   };
 
+  const [msg, setMsg] = useState("");
+  const ordered = () => list.filter((p) => sel.has(p.id));
+  const merge = () => {
+    const o = ordered();
+    if (!confirm(`Juntar ${o.length} produtos em "${o[0].name}"?\n\nAs fotos dos outros serão movidas para ele e os outros produtos serão EXCLUÍDOS (com suas variações).`)) return;
+    start(async () => { const r = await mergeProducts({ ids: o.map((p) => p.id) }); setMsg(r.error ?? ""); setSel(new Set()); });
+  };
+  const copyVars = () => {
+    const o = ordered();
+    if (!o[0].product_variants.length) return setMsg(`"${o[0].name}" (o primeiro da lista) não tem variações para copiar.`);
+    if (!confirm(`Copiar as variações de "${o[0].name}" para ${o.length - 1} produto(s)? As variações atuais deles serão substituídas (o estoque fica sem controle até você preencher).`)) return;
+    start(async () => { const r = await copyVariants({ sourceId: o[0].id, targetIds: o.slice(1).map((p) => p.id) }); setMsg(r.error ?? "Variações copiadas."); setSel(new Set()); });
+  };
+
   const chips: [Filter, string][] = [["todos", "Todos"], ["visiveis", "Visíveis"], ["ocultos", "Ocultos"], ["sem", "Sem estoque"], ["baixo", "Estoque baixo"]];
 
   return (
@@ -202,7 +261,12 @@ export default function ProductList({ products, storeId, ratings, templates }: {
           <input value={bulkVal} onChange={(e) => setBulkVal(e.target.value)} placeholder="Categoria ou tags" />
           <button className="btn sm" disabled={pending || !bulkVal.trim()} onClick={() => bulk("category", bulkVal)}>Definir categoria</button>
           <button className="btn sm" disabled={pending || !bulkVal.trim()} onClick={() => bulk("tags_add", bulkVal)}>Adicionar tags</button>
+          <button className="btn sm" disabled={pending || sel.size < 2} onClick={() => merge()}
+            title="As fotos dos demais vão para o primeiro da lista e os demais são removidos">Juntar em um produto</button>
+          <button className="btn sm" disabled={pending || sel.size < 2} onClick={() => copyVars()}
+            title="Copia as variações do primeiro da lista para os outros selecionados">Copiar variações do 1º</button>
           <button className="btn sm danger" disabled={pending} onClick={() => bulk("delete")}>Excluir</button>
+          {msg && <span className="muted">{msg}</span>}
         </div>
       )}
       {!list.length && <p className="muted">Nenhum produto encontrado com esses filtros.</p>}

@@ -11,6 +11,7 @@ export default async function Importar({ params, searchParams }: { params: Promi
     <>
       <h2>Importar do Google Drive</h2>
       <p className="muted">Escolha as fotos direto do seu Drive (você pode abrir pastas dentro da janela do Google). Só as fotos que você escolher ficam acessíveis ao app. O nome do produto vem do nome do arquivo e você edita depois.</p>
+      <div className="card note"><b>Mesmo produto em várias cores ou tamanhos?</b> Escolha todas as fotos e use <i>Juntar em um produto</i> (ex.: “Camisa Lacoste”). Depois, em <i>Produtos</i>, monte a grade de tamanhos × cores e associe cada foto à sua variação. Se já criou um produto por foto, marque-os na lista de Produtos e clique em <i>Juntar em um produto</i>.</div>
       <Importer storeId={id} products={(products ?? []).map((p) => ({ id: p.id, name: p.name }))} used={used} initialProduct={produto} />
     </>
   );
