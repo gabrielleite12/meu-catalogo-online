@@ -15,6 +15,86 @@ const priceOf = (p: Product, v?: Variant) => (v?.price ?? p.price) as number | n
 const soldOut = (p: Product) => (vars(p).length ? vars(p).every((v) => avail(p, v) <= 0) : avail(p) <= 0);
 const norm = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
+
+const stockText = (v: Variant) => (v.stock == null ? "Disponível" : v.stock > 0 ? `${v.stock} em estoque` : "Esgotado");
+const looksNumber = (a: string[]) => a.every((x) => /^\d+([.,]\d+)?$/.test(x));
+const looksSize = (a: string[]) => a.every((x) => /^(PP|P|M|G|GG|XG|XGG|U|UNICO|ÚNICO)$/i.test(x));
+
+/** Escolha de opção: número/tamanho × cor, com estoque de cada combinação. */
+function Picker({ p, cart, renderQty, onPhoto }: {
+  p: Product; cart: Record<string, number>; renderQty: (p: Product, v?: Variant) => React.ReactNode; onPhoto: (id: string | null) => void;
+}) {
+  const vs = vars(p);
+  const parts = vs.map((v) => v.name.split(" / ").map((x) => x.trim()));
+  const two = vs.length > 0 && parts.every((a) => a.length === 2);
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+
+  const aVals = [...new Set(parts.map((x) => x[0]))];
+  const bVals = [...new Set(parts.map((x) => x[1]))];
+  const find = (x: string, y: string) => vs.find((v, i) => parts[i][0] === x && parts[i][1] === y);
+  const aLabel = looksNumber(aVals) ? "Número" : looksSize(aVals) ? "Tamanho" : "Opção";
+  const bLabel = "Cor";
+  const chosen = two && a && b ? find(a, b) : undefined;
+  const inCart = Object.entries(cart).reduce((n, [k, q]) => (k.startsWith(p.id + "|") ? n + q : n), 0);
+
+  const list = (
+    <div className="vlist">
+      {vs.map((v) => (
+        <div className="line" key={v.id}>
+          {v.image_file_id && <button className="vthumb" onClick={() => onPhoto(v.image_file_id)} aria-label={`Ver foto ${v.name}`}><img src={imgUrl(v.image_file_id) + "?s=120"} alt="" /></button>}
+          <span onClick={() => v.image_file_id && onPhoto(v.image_file_id)}><b>{v.name}</b><br /><small className="muted">{priceOf(p, v) != null ? brl(priceOf(p, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`} · {stockText(v)}</small></span>
+          {renderQty(p, v)}
+        </div>
+      ))}
+    </div>
+  );
+  if (!two) return list;
+
+  return (
+    <div className="picker">
+      <div className="pk">
+        <b>{bLabel}</b>
+        <div className="opts">
+          {bVals.map((y) => {
+            const any = vs.some((v, i) => parts[i][1] === y && avail(p, v) > 0 && (!a || parts[i][0] === a));
+            return <button key={y} className={"opt" + (b === y ? " on" : "") + (any ? "" : " out")} onClick={() => { setB(b === y ? "" : y); const v = a && find(a, y); onPhoto((v && v.image_file_id) || vs.find((_, i) => parts[i][1] === y && _.image_file_id)?.image_file_id || null); }}>{y}</button>;
+          })}
+        </div>
+      </div>
+      <div className="pk">
+        <b>{aLabel}</b>
+        <div className="opts">
+          {aVals.map((x) => {
+            const any = vs.some((v, i) => parts[i][0] === x && avail(p, v) > 0 && (!b || parts[i][1] === b));
+            const exists = vs.some((_, i) => parts[i][0] === x && (!b || parts[i][1] === b));
+            return <button key={x} disabled={!exists} className={"opt" + (a === x ? " on" : "") + (any ? "" : " out")} onClick={() => setA(a === x ? "" : x)}>{x}</button>;
+          })}
+        </div>
+      </div>
+
+      <div className="pkresult">
+        {chosen ? (
+          <div className="between">
+            <span><b>{chosen.name}</b><br /><small className="muted">{priceOf(p, chosen) != null ? brl(priceOf(p, chosen)!) : "Sob consulta"} · {stockText(chosen)}</small></span>
+            {renderQty(p, chosen)}
+          </div>
+        ) : <small className="muted">Escolha {two ? `${bLabel.toLowerCase()} e ${aLabel.toLowerCase()}` : "uma opção"} para adicionar ao pedido.</small>}
+        {inCart > 0 && <small className="ok">🛒 {inCart} item(ns) deste produto no pedido</small>}
+      </div>
+
+      <div className="avail">
+        <b>Disponibilidade</b>
+        {bVals.map((y) => (
+          <div key={y} className="arow"><span className="ac">{y}</span>
+            <span className="an">{aVals.map((x) => { const v = find(x, y); return v ? <i key={x} className={avail(p, v) > 0 ? "" : "o"}>{x}{v.stock != null && <em>: {v.stock > 0 ? v.stock : "esgotado"}</em>}</i> : null; })}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function priceLabel(p: Product) {
   const vs = vars(p);
   const prices = (vs.length ? vs.map((v) => priceOf(p, v)) : [p.price]).filter((x): x is number => x != null);
@@ -170,15 +250,7 @@ export default function Catalog({ store, products, ratings, reviews, viewer }: {
             {ratings[zoom.id] && <Stars value={ratings[zoom.id].avg_rating} count={ratings[zoom.id].total} />}
             {zoom.description && <p>{zoom.description}</p>}
             {vars(zoom).length ? (
-              <div className="vlist">
-                {vars(zoom).map((v) => (
-                  <div className="line" key={v.id}>
-                    {v.image_file_id && <button className="vthumb" onClick={() => setHero(v.image_file_id)} aria-label={`Ver foto ${v.name}`}><img src={imgUrl(v.image_file_id) + "?s=120"} alt="" /></button>}
-                    <span onClick={() => v.image_file_id && setHero(v.image_file_id)}><b>{v.name}</b><br /><small className="muted">{priceOf(zoom, v) != null ? brl(priceOf(zoom, v)!) : "Sob consulta"}{v.sku && ` · ${v.sku}`}{v.stock != null && (v.stock > 0 ? ` · ${v.stock} em estoque` : " · esgotado")}</small></span>
-                    <Qty p={zoom} v={v} />
-                  </div>
-                ))}
-              </div>
+              <Picker key={zoom.id} p={zoom} cart={cart} renderQty={(pp, vv) => <Qty p={pp} v={vv} />} onPhoto={setHero} />
             ) : (
               <div className="between"><span className="price">{priceLabel(zoom)}</span><Qty p={zoom} /></div>
             )}

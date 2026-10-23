@@ -24,13 +24,13 @@ function stockInfo(p: Product) {
 const isOut = (p: Product) => { const s = stockInfo(p); return s.tracked && s.qty <= 0; };
 const isLow = (p: Product) => { const s = stockInfo(p); return s.tracked && s.qty > 0 && s.qty <= (p.low_stock_alert ?? 0); };
 
-function Editor({ p, rating, templates, categories }: {
-  p: Product; rating?: { avg_rating: number; total: number }; templates: Template[]; categories: string[];
+function Editor({ p, rating, templates, categories, startVar }: {
+  p: Product; startVar?: boolean; rating?: { avg_rating: number; total: number }; templates: Template[]; categories: string[];
 }) {
   const [rows, setRows] = useState<Row[]>([...p.product_variants].sort((a, b) => a.position - b.position).map(toRow));
   const [groups, setGroups] = useState<Group[]>([{ name: "Tamanho", options: "" }, { name: "Cor", options: "" }]);
   const [track, setTrack] = useState(p.track_stock);
-  const [mode, setMode] = useState<"simple" | "var">(p.product_variants.length ? "var" : "simple");
+  const [mode, setMode] = useState<"simple" | "var">(p.product_variants.length || startVar ? "var" : "simple");
   const gKey = `vgroups:${p.store_id}`;
   useEffect(() => { try { const g = JSON.parse(localStorage.getItem(gKey) || "null"); if (Array.isArray(g) && g.length) setGroups(g); } catch {} }, [gKey]);
   useEffect(() => { try { localStorage.setItem(gKey, JSON.stringify(groups)); } catch {} }, [groups, gKey]);
@@ -81,22 +81,6 @@ function Editor({ p, rating, templates, categories }: {
         <label>Nome<input name="name" defaultValue={p.name} /></label>
         <label>SKU / código interno<input name="sku" defaultValue={p.sku ?? ""} placeholder="Opcional" /></label>
       </div>
-      <div className="row2">
-        <label>Categoria
-          <input name="category" list={`cats-${p.id}`} defaultValue={p.category ?? ""} placeholder="Ex.: Camisetas, Calçados…" />
-          <datalist id={`cats-${p.id}`}>{categories.map((c) => <option key={c} value={c} />)}</datalist>
-        </label>
-        <label>Tags <small>separe por vírgula: gênero, tipo, marca, cor…</small>
-          <input name="tags" list={`tags-${p.id}`} defaultValue={p.tags.join(", ")} placeholder="Masculino, Camiseta, Nike" />
-          <datalist id={`tags-${p.id}`}>{SUGGEST_TAGS.map((t) => <option key={t} value={t} />)}</datalist>
-        </label>
-      </div>
-      <div className="row2">
-        <label>Preço (opcional)<input name="price" defaultValue={p.price ?? ""} inputMode="decimal" placeholder="0,00" /></label>
-        <label>Código de barras<input name="barcode" defaultValue={p.barcode ?? ""} placeholder="Opcional" inputMode="numeric" /></label>
-      </div>
-      <label>Descrição<textarea name="description" rows={2} defaultValue={p.description ?? ""} /></label>
-
       <fieldset className="variants">
         <legend>Tipo de produto e estoque</legend>
         <div className="seg" role="radiogroup">
@@ -121,6 +105,12 @@ function Editor({ p, rating, templates, categories }: {
       {mode === "var" && (
       <fieldset className="variants">
         <legend>Variações do produto</legend>
+        <div className="presets">
+          <span className="muted">Atalhos:</span>
+          <button type="button" className="fchip" onClick={() => setGroups([{ name: "Número", options: "34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44" }, { name: "Cor", options: "" }])}>👟 Calçados</button>
+          <button type="button" className="fchip" onClick={() => setGroups([{ name: "Tamanho", options: "P, M, G, GG" }, { name: "Cor", options: "" }])}>👕 Roupas</button>
+          <button type="button" className="fchip" onClick={() => setGroups([{ name: "Cor", options: "" }])}>🎨 Só cor</button>
+        </div>
         <ol className="steps"><li>Escolha um modelo ou digite as opções de cada atributo (ex.: Tamanho: 38, 39 · Cor: Vermelho, Preto).</li><li>Preencha a quantidade de cada combinação na grade (vazio = não existe).</li><li>Clique em <b>Salvar</b>.</li></ol>
         <div className="groups">
           {groups.map((g, i) => (
@@ -203,6 +193,23 @@ function Editor({ p, rating, templates, categories }: {
       </fieldset>
       )}
 
+      <div className="row2">
+        <label>Categoria
+          <input name="category" list={`cats-${p.id}`} defaultValue={p.category ?? ""} placeholder="Ex.: Camisetas, Calçados…" />
+          <datalist id={`cats-${p.id}`}>{categories.map((c) => <option key={c} value={c} />)}</datalist>
+        </label>
+        <label>Tags <small>separe por vírgula: gênero, tipo, marca, cor…</small>
+          <input name="tags" list={`tags-${p.id}`} defaultValue={p.tags.join(", ")} placeholder="Masculino, Camiseta, Nike" />
+          <datalist id={`tags-${p.id}`}>{SUGGEST_TAGS.map((t) => <option key={t} value={t} />)}</datalist>
+        </label>
+      </div>
+      <div className="row2">
+        <label>Preço (opcional)<input name="price" defaultValue={p.price ?? ""} inputMode="decimal" placeholder="0,00" /></label>
+        <label>Código de barras<input name="barcode" defaultValue={p.barcode ?? ""} placeholder="Opcional" inputMode="numeric" /></label>
+      </div>
+      <label>Descrição<textarea name="description" rows={2} defaultValue={p.description ?? ""} /></label>
+
+
       {dirty && !saving && <p className="warn">⚠ Você alterou as variações e ainda não salvou. Clique em <b>Salvar</b> para elas aparecerem no catálogo.</p>}
       {st.error && <p className="err">{st.error}</p>}
       {st.ok && !saving && !dirty && <p className="ok">✓ Salvo</p>}
@@ -231,6 +238,7 @@ export default function ProductList({ products, storeId, ratings, templates }: {
   const [cat, setCat] = useState("");
   const [tag, setTag] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [varFor, setVarFor] = useState<string | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [bulkVal, setBulkVal] = useState("");
   const [pending, start] = useTransition();
@@ -332,6 +340,9 @@ export default function ProductList({ products, storeId, ratings, templates }: {
                   </span>
                   <span className="chev">{isOpen ? "▲" : "▼"}</span>
                 </button>
+                {!p.product_variants.length && (
+                  <button className="btn sm primary qa" onClick={() => { setVarFor(p.id); setOpen(p.id); }} title="Criar a grade de tamanhos e cores deste produto">Tamanhos e cores</button>
+                )}
                 <form action={toggleProduct} className="qa">
                   <input type="hidden" name="id" value={p.id} />
                   <input type="hidden" name="active" value={String(!p.active)} />
@@ -354,7 +365,7 @@ export default function ProductList({ products, storeId, ratings, templates }: {
                     ))}
                     <Link className="thumb add" href={`/painel/${storeId}/importar?produto=${p.id}`} title="Adicionar fotos">+</Link>
                   </div>
-                  <Editor p={p} rating={ratings[p.id]} templates={templates} categories={categories} />
+                  <Editor key={`${p.id}-${varFor === p.id}`} p={p} startVar={varFor === p.id} rating={ratings[p.id]} templates={templates} categories={categories} />
                 </div>
               )}
             </div>
