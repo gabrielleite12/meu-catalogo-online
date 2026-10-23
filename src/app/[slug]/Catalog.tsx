@@ -11,7 +11,7 @@ type Viewer = { loggedIn: boolean; hasProfile: boolean };
 const vars = (p: Product) => p.product_variants.filter((v) => v.active).sort((a, b) => a.position - b.position);
 const key = (p: Product, v?: Variant) => `${p.id}|${v?.id ?? ""}`;
 const avail = (p: Product, v?: Variant) => (v ? (v.stock == null ? 999 : v.stock) : p.track_stock ? p.stock ?? 0 : 999);
-const priceOf = (p: Product, v?: Variant) => (v?.price ?? p.price) as number | null;
+const priceOf = (p: Product, v?: Variant) => { const x = v?.price ?? p.price; return x != null && Number(x) > 0 ? Number(x) : null; };
 const soldOut = (p: Product) => (vars(p).length ? vars(p).every((v) => avail(p, v) <= 0) : avail(p) <= 0);
 const norm = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -97,7 +97,7 @@ function Picker({ p, cart, renderQty, onPhoto }: {
 
 function priceLabel(p: Product) {
   const vs = vars(p);
-  const prices = (vs.length ? vs.map((v) => priceOf(p, v)) : [p.price]).filter((x): x is number => x != null);
+  const prices = (vs.length ? vs.map((v) => priceOf(p, v)) : [priceOf(p)]).filter((x): x is number => x != null);
   if (!prices.length) return "Sob consulta";
   const min = Math.min(...prices), max = Math.max(...prices);
   return min === max ? brl(min) : `a partir de ${brl(min)}`;

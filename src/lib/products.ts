@@ -4,6 +4,7 @@ import { csvList } from "./utils";
 
 type VariantInput = { id?: string; name: string; sku?: string; barcode?: string; image?: string; price?: string | number | null; stock?: string | number | null };
 // "1.299,90" -> 1299.9 · "199.9" -> 199.9 · "199,9" -> 199.9
+const pos = (n: number | null) => (n != null && n > 0 ? n : null); // preço 0 = sem preço (sob consulta)
 export const num = (v: unknown) => {
   let t = String(v ?? "").trim();
   if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
@@ -27,7 +28,7 @@ export async function saveProductForm(supabase: SupabaseClient, fd: FormData): P
     hide_when_out: fd.get("hide_when_out") === "on",
     auto_hidden: false,
     description: String(fd.get("description") ?? "").trim() || null,
-    price: num(fd.get("price")),
+    price: pos(num(fd.get("price"))),
     track_stock: variants.length ? false : track,
     stock: variants.length ? null : track ? Math.max(0, parseInt(String(fd.get("stock") ?? "0"), 10) || 0) : null,
     active: fd.get("active") === "on",
@@ -44,7 +45,7 @@ export async function saveProductForm(supabase: SupabaseClient, fd: FormData): P
   }
   for (const [position, v] of variants.entries()) {
     const stock = num(v.stock);
-    const row = { name: v.name.trim(), sku: v.sku?.trim() || null, barcode: v.barcode?.trim() || null, image_file_id: v.image?.trim() || null, price: num(v.price), stock: stock == null ? null : Math.max(0, Math.floor(stock)), position };
+    const row = { name: v.name.trim(), sku: v.sku?.trim() || null, barcode: v.barcode?.trim() || null, image_file_id: v.image?.trim() || null, price: pos(num(v.price)), stock: stock == null ? null : Math.max(0, Math.floor(stock)), position };
     const { error } = v.id
       ? await supabase.from("product_variants").update(row).eq("id", v.id)
       : await supabase.from("product_variants").insert({ ...row, product_id: id });
