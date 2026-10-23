@@ -30,13 +30,14 @@ function Editor({ p, rating, templates, categories }: {
   const [rows, setRows] = useState<Row[]>([...p.product_variants].sort((a, b) => a.position - b.position).map(toRow));
   const [groups, setGroups] = useState<Group[]>([{ name: "Tamanho", options: "" }, { name: "Cor", options: "" }]);
   const [track, setTrack] = useState(p.track_stock);
+  const [mode, setMode] = useState<"simple" | "var">(p.product_variants.length ? "var" : "simple");
   const gKey = `vgroups:${p.store_id}`;
   useEffect(() => { try { const g = JSON.parse(localStorage.getItem(gKey) || "null"); if (Array.isArray(g) && g.length) setGroups(g); } catch {} }, [gKey]);
   useEffect(() => { try { localStorage.setItem(gKey, JSON.stringify(groups)); } catch {} }, [groups, gKey]);
   const [st, act, saving] = useActionState(updateProduct, {});
   const strip = (r: Row[]) => JSON.stringify(r.map(({ id: _id, ...rest }) => rest));
   const saved = useMemo(() => [...p.product_variants].sort((a, b) => a.position - b.position).map(toRow), [p.product_variants]);
-  const dirty = strip(rows) !== strip(saved);
+  const dirty = mode === "var" ? strip(rows) !== strip(saved) : saved.length > 0;
   // depois de salvar, recarrega as linhas do servidor (com os ids novos)
   const sync = useRef(false);
   useEffect(() => { if (st.ok) sync.current = true; }, [st]);
@@ -74,7 +75,7 @@ function Editor({ p, rating, templates, categories }: {
   return (
     <form action={act} className="form">
       <input type="hidden" name="id" value={p.id} />
-      <input type="hidden" name="variants" value={JSON.stringify(rows)} />
+      <input type="hidden" name="variants" value={JSON.stringify(mode === "var" ? rows : [])} />
       {rating && <p className="muted">★ {rating.avg_rating} ({rating.total} avaliações)</p>}
       <div className="row2">
         <label>Nome<input name="name" defaultValue={p.name} /></label>
@@ -97,21 +98,30 @@ function Editor({ p, rating, templates, categories }: {
       <label>Descrição<textarea name="description" rows={2} defaultValue={p.description ?? ""} /></label>
 
       <fieldset className="variants">
-        <legend>Estoque</legend>
-        {rows.length === 0 ? (
+        <legend>Tipo de produto e estoque</legend>
+        <div className="seg" role="radiogroup">
+          <button type="button" role="radio" aria-checked={mode === "simple"} className={mode === "simple" ? "on" : ""}
+            onClick={() => { if (mode === "var" && rows.length && !confirm("Voltar para produto simples? As variações abaixo serão apagadas ao salvar.")) return; setMode("simple"); }}>
+            Produto simples<small>um só estoque</small></button>
+          <button type="button" role="radio" aria-checked={mode === "var"} className={mode === "var" ? "on" : ""} onClick={() => setMode("var")}>
+            Com variações<small>tamanho, cor… cada uma com seu estoque</small></button>
+        </div>
+        {mode === "simple" ? (
           <div className="row2">
             <label className="check"><input type="checkbox" name="track_stock" checked={track} onChange={(e) => setTrack(e.target.checked)} /> Controlar estoque</label>
             <label>Quantidade<input name="stock" type="number" min={0} defaultValue={p.stock ?? 0} disabled={!track} /></label>
           </div>
-        ) : <small className="muted">Este produto tem variações: o estoque é controlado em cada variação (deixe vazio para não controlar).</small>}
+        ) : <small className="muted">Monte a grade logo abaixo: informe o estoque de cada combinação (ex.: 38 Vermelho = 2, 39 Vermelho = 1). O estoque total é a soma delas.</small>}
         <div className="row2">
           <label>Avisar quando restar até <small>unidades (opcional)</small><input name="low_stock_alert" type="number" min={0} defaultValue={p.low_stock_alert ?? ""} placeholder="Ex.: 3" /></label>
           <label className="check"><input type="checkbox" name="hide_when_out" defaultChecked={p.hide_when_out} /> Ocultar sozinho quando o estoque acabar (e reexibir ao repor)</label>
         </div>
       </fieldset>
 
+      {mode === "var" && (
       <fieldset className="variants">
-        <legend>Variações (tamanho, cor…) <small className="muted">opcional</small></legend>
+        <legend>Variações do produto</legend>
+        <ol className="steps"><li>Escolha um modelo ou digite as opções de cada atributo (ex.: Tamanho: 38, 39 · Cor: Vermelho, Preto).</li><li>Preencha a quantidade de cada combinação na grade (vazio = não existe).</li><li>Clique em <b>Salvar</b>.</li></ol>
         <div className="groups">
           {groups.map((g, i) => (
             <div className="grow" key={i}>
@@ -191,6 +201,7 @@ function Editor({ p, rating, templates, categories }: {
         <button type="button" className="link" onClick={() => setRows((r) => [...r, blank()])}>+ Adicionar variação manualmente</button>
         <small className="muted block">Os atributos acima ficam salvos para os próximos produtos: você não precisa digitar de novo.</small>
       </fieldset>
+      )}
 
       {dirty && !saving && <p className="warn">⚠ Você alterou as variações e ainda não salvou. Clique em <b>Salvar</b> para elas aparecerem no catálogo.</p>}
       {st.error && <p className="err">{st.error}</p>}
