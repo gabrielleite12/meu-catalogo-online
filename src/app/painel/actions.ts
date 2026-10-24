@@ -1,9 +1,12 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { nameFromFile } from "@/lib/google";
-import { slugify, csvList } from "@/lib/utils";
+import { slugify, csvList, safeNext } from "@/lib/utils";
+import { orderErrorMessage } from "@/lib/orders";
+import { notifyOrder } from "@/lib/notify";
 import { saveProductForm, num } from "@/lib/products";
 
 async function ctx() {
@@ -59,7 +62,7 @@ export async function deleteStore(fd: FormData) {
 type FileRef = { id: string; name: string };
 
 /** mode: each = um produto por foto · group = várias fotos num produto · add = fotos em produto existente */
-export async function importFiles(input: { storeId: string; mode: "each" | "group" | "add"; files: FileRef[]; groupName?: string; productId?: string; category?: string; tags?: string }) {
+export async function importFiles(input: { storeId: string; mode: "each" | "group" | "add"; files: FileRef[]; groupName?: string; productId?: string; category?: string; subcategory?: string; tags?: string }) {
   const { supabase } = await ctx();
   if (!input.files.length) return { error: "Selecione ao menos uma foto." };
   const { data: store } = await supabase.from("stores").select("id").eq("id", input.storeId).maybeSingle();
@@ -80,7 +83,7 @@ export async function importFiles(input: { storeId: string; mode: "each" | "grou
     const cat = input.category?.trim() || null;
     const tags = csvList(input.tags ?? "");
     const rows = groups.map((g, i) => ({
-      store_id: store.id, position: pos + i, category: cat, tags,
+      store_id: store.id, position: pos + i, category: cat, subcategory: input.subcategory?.trim() || null, tags,
       name: input.mode === "group" && input.groupName?.trim() ? input.groupName.trim() : nameFromFile(g[0].name),
     }));
     // inserção em lote: uma consulta para os produtos e outra para as fotos
@@ -102,11 +105,12 @@ export async function updateProduct(_: unknown, fd: FormData): Promise<{ ok?: bo
   return r;
 }
 
-export async function bulkProducts(input: { ids: string[]; action: "delete" | "hide" | "show" | "category" | "tags_add"; value?: string }) {
+export async function bulkProducts(input: { ids: string[]; action: "delete" | "hide" | "show" | "category" | "subcategory" | "tags_add"; value?: string }) {
   const { supabase } = await ctx();
   if (!input.ids.length) return;
   if (input.action === "delete") await supabase.from("products").delete().in("id", input.ids);
   else if (input.action === "category") await supabase.from("products").update({ category: (input.value ?? "").trim() || null }).in("id", input.ids);
+  else if (input.action === "subcategory") await supabase.from("products").update({ subcategory: (input.value ?? "").trim() || null }).in("id", input.ids);
   else if (input.action === "tags_add") {
     const add = csvList(input.value ?? "");
     const { data } = await supabase.from("products").select("id,tags").in("id", input.ids);
@@ -191,17 +195,138 @@ export async function removeImage(fd: FormData) {
   refresh();
 }
 
-/** Lojista finaliza ou cancela (cancelar devolve o estoque reservado). */
+const dateOf = (fd: FormData) => { const d = String(fd.get("date") ?? ""); return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null; };
+const noteOf = (fd: FormData) => String(fd.get("note") ?? "").trim().slice(0, 200) || null;
+
+/** Lojista: aprovar, enviar (em trânsito, com dia combinado opcional), marcar entregue/retirado ou cancelar (cancelar devolve o estoque reservado e guarda o motivo). */
 export async function setOrderStatus(fd: FormData) {
   const { supabase } = await ctx();
   const id = String(fd.get("id"));
   const status = String(fd.get("status"));
-  if (status === "finalizado") await supabase.rpc("finalize_order", { p_order: id });
-  else if (status === "cancelado") await supabase.rpc("cancel_order", { p_order: id });
+  let error: { message: string } | null = null;
+  if (status === "aprovado") ({ error } = await supabase.rpc("approve_order", { p_order: id }));
+  else if (status === "enviado") ({ error } = await supabase.rpc("ship_order", { p_order: id, p_date: dateOf(fd), p_note: noteOf(fd) }));
+  else if (status === "finalizado") ({ error } = await supabase.rpc("deliver_order", { p_order: id }));
+  else if (status === "cancelado") ({ error } = await supabase.rpc("cancel_order", { p_order: id, p_reason: String(fd.get("reason") ?? "") }));
+  if (!error) {
+    const ev = { aprovado: "approved", enviado: "shipped", finalizado: "delivered_by_owner", cancelado: "canceled_by_owner" }[status] as "approved" | "shipped" | "delivered_by_owner" | "canceled_by_owner" | undefined;
+    if (ev) after(() => notifyOrder(id, ev));
+  }
   refresh();
+}
+
+/** Lojista combina ou altera o dia da entrega (e a janela, ex.: "entre 14h e 18h"); o cliente é avisado. */
+export async function scheduleDelivery(fd: FormData) {
+  const { supabase } = await ctx();
+  const id = String(fd.get("id"));
+  const date = dateOf(fd);
+  if (!date) return;
+  const { error } = await supabase.rpc("schedule_delivery", { p_order: id, p_date: date, p_note: noteOf(fd) });
+  if (!error) after(() => notifyOrder(id, "scheduled"));
+  refresh();
+}
+
+/** Devolução por item: campos qty_<item> (quantas voltaram) e descartar_<item> (não repor no estoque). */
+export async function returnItems(fd: FormData) {
+  const { supabase } = await ctx();
+  const id = String(fd.get("id"));
+  const back = safeNext(String(fd.get("back") ?? ""), "/painel");
+  const returns: { item: string; qty: number; restock: boolean }[] = [];
+  for (const [k, v] of fd.entries()) {
+    if (!k.startsWith("qty_")) continue;
+    const qty = Math.floor(Number(v));
+    const item = k.slice(4);
+    if (qty > 0) returns.push({ item, qty, restock: fd.get("descartar_" + item) == null });
+  }
+  const sep = back.includes("?") ? "&" : "?";
+  if (!returns.length) redirect(`${back}${sep}erro=${encodeURIComponent("Informe quantas unidades voltaram.")}`);
+  const { error } = await supabase.rpc("return_items", { p_order: id, p_returns: returns, p_reason: String(fd.get("reason") ?? "") });
+  refresh();
+  if (error) redirect(`${back}${sep}erro=${encodeURIComponent(orderErrorMessage(error.message))}`);
+  after(() => notifyOrder(id, "returned"));
+  redirect(`/painel/${String(fd.get("store"))}/pedidos?ok=${encodeURIComponent("Devolução registrada.")}`);
 }
 
 export async function signOut() {
   await (await supabaseServer()).auth.signOut();
   redirect("/");
+}
+
+// ---------- Fretes ----------
+const money = (v: FormDataEntryValue | null) => { const n = num(v); return n != null && n >= 0 ? Math.round(n * 100) / 100 : null; };
+const back = (store: string, tab: string, key: "ok" | "erro", msg: string): never => redirect(`/painel/${store}/${tab}?${key}=${encodeURIComponent(msg)}`);
+
+/** Frete soma no total ou só informa; aceita retirada na loja. */
+export async function saveShippingSettings(fd: FormData) {
+  const { supabase } = await ctx();
+  const store = String(fd.get("store"));
+  const { error } = await supabase.from("stores").update({
+    shipping_add_to_total: fd.get("add_to_total") === "1",
+    pickup_enabled: fd.get("pickup") === "on",
+  }).eq("id", store);
+  refresh();
+  if (error) back(store, "fretes", "erro", "Não foi possível salvar. Confira se a migração 012 foi aplicada.");
+  back(store, "fretes", "ok", "Configurações de frete salvas.");
+}
+
+/** Cria ou atualiza uma regra de frete (cidade, estado ou demais locais). */
+export async function saveShippingRule(fd: FormData) {
+  const { supabase } = await ctx();
+  const store = String(fd.get("store"));
+  const id = String(fd.get("id") ?? "");
+  const scope = String(fd.get("scope"));
+  const mode = String(fd.get("mode"));
+  const city = String(fd.get("city") ?? "").trim();
+  const state = String(fd.get("state") ?? "").trim().toUpperCase().slice(0, 2);
+  const fee = money(fd.get("fee"));
+  const freeAbove = money(fd.get("free_above"));
+  if (!["city", "state", "other"].includes(scope) || !["pago", "gratis", "combinar", "nao_entrega"].includes(mode)) back(store, "fretes", "erro", "Dados inválidos.");
+  if (scope === "city" && !city) back(store, "fretes", "erro", "Informe a cidade.");
+  if (scope === "state" && state.length !== 2) back(store, "fretes", "erro", "Escolha o estado.");
+  if (mode === "pago" && fee == null) back(store, "fretes", "erro", "Informe o valor do frete.");
+  const row = {
+    scope, mode,
+    city: scope === "city" ? city : null,
+    state: scope === "other" ? null : state.length === 2 ? state : null,
+    fee: mode === "pago" ? fee : null,
+    free_above: mode === "pago" && freeAbove ? freeAbove : null,
+    note: String(fd.get("note") ?? "").trim().slice(0, 120) || null,
+  };
+  const { error } = id
+    ? await supabase.from("shipping_rules").update(row).eq("id", id).eq("store_id", store)
+    : await supabase.from("shipping_rules").insert({ ...row, store_id: store, position: Math.floor(Date.now() / 1000) });
+  refresh();
+  if (error) back(store, "fretes", "erro", "Não foi possível salvar a regra: " + error.message);
+  back(store, "fretes", "ok", id ? "Regra atualizada." : "Regra adicionada.");
+}
+
+export async function deleteShippingRule(fd: FormData) {
+  const { supabase } = await ctx();
+  const store = String(fd.get("store"));
+  await supabase.from("shipping_rules").delete().eq("id", String(fd.get("id"))).eq("store_id", store);
+  refresh();
+  back(store, "fretes", "ok", "Regra removida.");
+}
+
+// ---------- Categorias ----------
+/** Renomeia (ou junta, se o nome novo já existe) uma categoria, tipo/modelo ou tag em todos os produtos da loja. Nome novo vazio = remove. */
+export async function renameLabel(fd: FormData) {
+  const { supabase } = await ctx();
+  const store = String(fd.get("store"));
+  const kind = String(fd.get("kind"));
+  const from = String(fd.get("from") ?? "");
+  const to = String(fd.get("to") ?? "").trim();
+  if (!from || !["category", "subcategory", "tag"].includes(kind)) back(store, "categorias", "erro", "Dados inválidos.");
+  if (kind === "tag") {
+    const { data } = await supabase.from("products").select("id,tags").eq("store_id", store).contains("tags", [from]);
+    for (const p of data ?? []) {
+      const tags = [...new Set((p.tags as string[]).map((t) => (t === from ? to : t)).filter(Boolean))];
+      await supabase.from("products").update({ tags }).eq("id", p.id);
+    }
+  } else {
+    const col = kind === "category" ? "category" : "subcategory";
+    await supabase.from("products").update({ [col]: to || null }).eq("store_id", store).eq(col, from);
+  }
+  refresh();
+  back(store, "categorias", "ok", to ? `"${from}" agora é "${to}".` : `"${from}" removido dos produtos.`);
 }

@@ -1,8 +1,10 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { safeNext } from "@/lib/utils";
+import { notifyOrder } from "@/lib/notify";
 
 type State = { error?: string; ok?: boolean };
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -43,7 +45,7 @@ export async function reviewStore(_: unknown, fd: FormData): Promise<State> {
     store_id: order.store_id, order_id: order.id, customer_id: user.id,
     reviewer_name: order.customer_name.split(" ")[0], rating, comment: s(fd, "comment").slice(0, 1000) || null,
   });
-  if (error) return { error: error.code === "23505" ? "Você já avaliou esta loja neste pedido." : "Só é possível avaliar pedidos finalizados." };
+  if (error) return { error: error.code === "23505" ? "Você já avaliou esta loja neste pedido." : "Só é possível avaliar pedidos entregues." };
   revalidatePath("/conta");
   return { ok: true };
 }
@@ -61,13 +63,24 @@ export async function reviewProduct(_: unknown, fd: FormData): Promise<State> {
     product_id: item.product_id, order_item_id: item.id, customer_id: user.id,
     reviewer_name: name.split(" ")[0], rating, comment: s(fd, "comment").slice(0, 1000) || null,
   });
-  if (error) return { error: error.code === "23505" ? "Você já avaliou este item." : "Só é possível avaliar pedidos finalizados." };
+  if (error) return { error: error.code === "23505" ? "Você já avaliou este item." : "Só é possível avaliar pedidos entregues." };
   revalidatePath("/conta");
   return { ok: true };
 }
 
 export async function cancelMyOrder(fd: FormData) {
   const { supabase } = await ctx();
-  await supabase.rpc("cancel_order", { p_order: String(fd.get("id")) });
+  const id = String(fd.get("id"));
+  const { error } = await supabase.rpc("cancel_order", { p_order: id, p_reason: String(fd.get("reason") ?? "") });
+  if (!error) after(() => notifyOrder(id, "canceled_by_customer"));
+  revalidatePath("/conta");
+}
+
+/** Cliente confirma que recebeu: o pedido vira entregue e libera as avaliações. */
+export async function confirmDelivery(fd: FormData) {
+  const { supabase } = await ctx();
+  const id = String(fd.get("id"));
+  const { error } = await supabase.rpc("deliver_order", { p_order: id });
+  if (!error) after(() => notifyOrder(id, "delivered_by_customer"));
   revalidatePath("/conta");
 }

@@ -33,12 +33,12 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
             </div>
           </div>
         </section>
-        <StoreCart store={{ slug: store.slug, name: store.name, whatsapp: store.whatsapp }} products={products} viewer={r.viewer}>
+        <StoreCart store={{ slug: store.slug, name: store.name, whatsapp: store.whatsapp }} products={products} viewer={r.viewer} shipping={r.shipping}>
           <Catalog slug={store.slug} products={products} ratings={r.productRatings} />
         </StoreCart>
         <section id="avaliacoes" className="reviews">
           <h2>Avaliações da loja</h2>
-          {!r.storeReviews.length && <p className="muted">Ninguém avaliou ainda. Só clientes com pedido finalizado podem avaliar.</p>}
+          {!r.storeReviews.length && <p className="muted">Ninguém avaliou ainda. Só clientes com pedido entregue podem avaliar.</p>}
           {r.storeReviews.map((v) => (
             <div key={v.id} className="card rv">
               <div className="between"><strong>{v.reviewer_name}</strong><Stars value={v.rating} /></div>

@@ -4,9 +4,11 @@ import Link from "next/link";
 import { brl, imgUrl, type Product, type Variant } from "@/lib/utils";
 import { avail, key, priceOf, vars } from "@/lib/catalog";
 import { placeOrder } from "@/app/[slug]/actions";
+import { quoteShipping, type ShippingRule } from "@/lib/shipping";
 
 type StoreInfo = { slug: string; name: string; whatsapp: string | null };
-type Viewer = { loggedIn: boolean; hasProfile: boolean };
+type Viewer = { loggedIn: boolean; hasProfile: boolean; city?: string | null; state?: string | null };
+type Shipping = { rules: ShippingRule[]; addToTotal: boolean; pickup: boolean };
 type Ctx = {
   store: StoreInfo; products: Product[];
   qty: (p: Product, v?: Variant) => number;
@@ -22,8 +24,8 @@ export const useStoreCart = () => {
 };
 
 /** Carrinho da loja: guarda no navegador, compartilhado entre a vitrine e a página do produto. */
-export default function StoreCart({ store, products, viewer, floatingBar = true, children }: {
-  store: StoreInfo; products: Product[]; viewer: Viewer; floatingBar?: boolean; children: React.ReactNode;
+export default function StoreCart({ store, products, viewer, shipping, floatingBar = true, children }: {
+  store: StoreInfo; products: Product[]; viewer: Viewer; shipping: Shipping; floatingBar?: boolean; children: React.ReactNode;
 }) {
   const storageKey = `cart2:${store.slug}`;
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -32,6 +34,7 @@ export default function StoreCart({ store, products, viewer, floatingBar = true,
   const [obs, setObs] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
+  const [pickup, setPickup] = useState(false);
 
   useEffect(() => { try { setCart(JSON.parse(localStorage.getItem(storageKey) || "{}")); } catch {} setReady(true); }, [storageKey]);
   useEffect(() => { if (ready) try { localStorage.setItem(storageKey, JSON.stringify(cart)); } catch {} }, [cart, storageKey, ready]);
@@ -53,10 +56,17 @@ export default function StoreCart({ store, products, viewer, floatingBar = true,
   const count = lines.reduce((a, l) => a + l.n, 0);
   const total = lines.reduce((a, l) => a + (priceOf(l.p, l.v) ?? 0) * l.n, 0);
 
+  // frete conforme a cidade/estado do cadastro do cliente (o valor definitivo é calculado no servidor ao enviar)
+  const quote = useMemo(() => quoteShipping(shipping.rules, { city: viewer.city, state: viewer.state }, total), [shipping.rules, viewer.city, viewer.state, total]);
+  const usePickup = pickup && shipping.pickup;
+  const blocked = !usePickup && quote.mode === "nao_entrega";
+  const fee = usePickup ? 0 : quote.fee;
+  const finalTotal = total + (shipping.addToTotal && fee ? fee : 0);
+
   async function send() {
     setErr(""); setSending(true);
     const win = window.open("", "_blank");
-    const r = await placeOrder({ slug: store.slug, items: lines.map((l) => ({ id: l.p.id, variantId: l.v?.id, qty: l.n })), notes: obs });
+    const r = await placeOrder({ slug: store.slug, items: lines.map((l) => ({ id: l.p.id, variantId: l.v?.id, qty: l.n })), notes: obs, pickup: usePickup });
     setSending(false);
     if (!r.link) { win?.close(); return setErr(r.error ?? "Erro ao enviar."); }
     setCart({}); setOpen(false);
@@ -93,7 +103,22 @@ export default function StoreCart({ store, products, viewer, floatingBar = true,
                 </span>
               </div>
             ))}
-            <div className="between total"><span>Total</span><b>{total > 0 ? brl(total) : "—"}</b></div>
+            <div className="shipbox">
+              {shipping.pickup && (
+                <div className="pick">
+                  <label><input type="radio" checked={!usePickup} onChange={() => setPickup(false)} /> Receber em casa</label>
+                  <label><input type="radio" checked={usePickup} onChange={() => setPickup(true)} /> Retirar na loja</label>
+                </div>
+              )}
+              <div className="freteline">
+                <span>🚚 {usePickup ? "Retirada na loja" : quote.label}{!usePickup && quote.note ? <small className="muted block">{quote.note}</small> : null}</span>
+                <b>{usePickup ? "grátis" : quote.mode === "pago" ? brl(quote.fee ?? 0) : quote.mode === "gratis" ? "grátis" : ""}</b>
+              </div>
+              {!usePickup && quote.mode === "pago" && !shipping.addToTotal && <small className="muted">Cobrado à parte, não entra no total abaixo.</small>}
+              {!usePickup && viewer.loggedIn && !viewer.city && <small className="muted block">Complete seu endereço em Minha conta para calcular o frete.</small>}
+              {blocked && <p className="err">A loja não entrega {viewer.city ? `em ${viewer.city}` : "neste endereço"}.{shipping.pickup ? " Escolha retirar na loja." : " Fale com ela pelo WhatsApp."}</p>}
+            </div>
+            <div className="between total"><span>Total</span><b>{finalTotal > 0 ? brl(finalTotal) : "—"}</b></div>
             <div className="form">
               <label>Observações<textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Forma de pagamento, retirada, horário…" /></label>
             </div>
@@ -101,7 +126,7 @@ export default function StoreCart({ store, products, viewer, floatingBar = true,
             {!store.whatsapp ? <p className="err">Esta loja ainda não informou um WhatsApp.</p>
               : !viewer.loggedIn ? <Link className="btn primary block" href={`/login?next=/${store.slug}`}>Entrar para fazer o pedido</Link>
               : !viewer.hasProfile ? <Link className="btn primary block" href={`/conta?next=/${store.slug}`}>Completar cadastro para pedir</Link>
-              : <button className="btn whats block" disabled={sending || !lines.length} onClick={send}>{sending ? "Enviando…" : "Enviar pedido pelo WhatsApp"}</button>}
+              : <button className="btn whats block" disabled={sending || !lines.length || blocked} onClick={send}>{sending ? "Enviando…" : "Enviar pedido pelo WhatsApp"}</button>}
             <small className="muted">Seu nome, telefone e endereço cadastrados vão junto com o pedido.</small>
             <button className="link" onClick={() => setCart({})}>Limpar pedido</button>
           </aside>

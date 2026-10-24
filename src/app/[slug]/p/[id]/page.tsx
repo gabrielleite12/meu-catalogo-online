@@ -26,7 +26,7 @@ export default async function ProdutoPage({ params }: Params) {
   return (
     <>
       <SiteHeader />
-      <StoreCart store={{ slug: store.slug, name: store.name, whatsapp: store.whatsapp }} products={r.products} viewer={r.viewer} floatingBar={false}>
+      <StoreCart store={{ slug: store.slug, name: store.name, whatsapp: store.whatsapp }} products={r.products} viewer={r.viewer} shipping={r.shipping} floatingBar={false}>
         <ProductView
           store={{ slug: store.slug, name: store.name, logo_url: store.logo_url, payment_methods: store.payment_methods, delivery_methods: store.delivery_methods }}
           product={product} rating={r.productRatings[id] ?? null} reviews={r.productReviews[id] ?? []} related={related}

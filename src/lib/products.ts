@@ -23,6 +23,7 @@ export async function saveProductForm(supabase: SupabaseClient, fd: FormData): P
     sku: String(fd.get("sku") ?? "").trim() || null,
     barcode: String(fd.get("barcode") ?? "").trim() || null,
     category: String(fd.get("category") ?? "").trim() || null,
+    subcategory: String(fd.get("subcategory") ?? "").trim() || null,
     tags: csvList(String(fd.get("tags") ?? "")),
     low_stock_alert: (() => { const n = num(fd.get("low_stock_alert")); return n == null ? null : Math.max(0, Math.floor(n)); })(),
     hide_when_out: fd.get("hide_when_out") === "on",

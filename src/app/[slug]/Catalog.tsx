@@ -30,28 +30,54 @@ export default function Catalog({ slug, products, ratings }: { slug: string; pro
   const cart = useStoreCart();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
+  const [type, setType] = useState("");
   const [tag, setTag] = useState("");
-  const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean) as string[])].sort(), [products]);
-  const tags = useMemo(() => [...new Set(products.flatMap((p) => p.tags))].sort(), [products]);
+  const [sort, setSort] = useState<"" | "menor" | "maior">("");
+  const [onlyAvail, setOnlyAvail] = useState(false);
+  const uniq = (xs: (string | null)[]) => [...new Set(xs.filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const categories = useMemo(() => uniq(products.map((p) => p.category)), [products]);
+  // tipos/modelos: só os da categoria escolhida (ou todos, se nenhuma)
+  const types = useMemo(() => uniq(products.filter((p) => !cat || p.category === cat).map((p) => p.subcategory)), [products, cat]);
+  const tags = useMemo(() => uniq(products.filter((p) => (!cat || p.category === cat) && (!type || p.subcategory === type)).flatMap((p) => p.tags)), [products, cat, type]);
+  const countOf = (f: (p: Product) => boolean) => products.filter(f).length;
   const filtered = products.filter((p) =>
-    norm([p.name, p.sku, p.category, ...p.tags].filter(Boolean).join(" ")).includes(norm(q)) && (!cat || p.category === cat) && (!tag || p.tags.includes(tag)));
+    norm([p.name, p.sku, p.category, p.subcategory, ...p.tags].filter(Boolean).join(" ")).includes(norm(q)) &&
+    (!cat || p.category === cat) && (!type || p.subcategory === type) && (!tag || p.tags.includes(tag)) && (!onlyAvail || !soldOut(p)));
+  const shown = sort ? [...filtered].sort((a, b) => ((priceOf(a) ?? Infinity) - (priceOf(b) ?? Infinity)) * (sort === "menor" ? 1 : -1)) : filtered;
+  const pickCat = (c: string) => { setCat(cat === c ? "" : c); setType(""); setTag(""); };
+  const clear = () => { setQ(""); setCat(""); setType(""); setTag(""); setSort(""); setOnlyAvail(false); };
+  const active = !!(q || cat || type || tag || sort || onlyAvail);
 
   return (
     <>
       <input className="filter" placeholder="Buscar nesta loja…" value={q} onChange={(e) => setQ(e.target.value)} />
-      {(categories.length > 0 || tags.length > 0) && (
-        <div className="chipbar shopfilters hscroll">
-          {categories.length > 0 && <>
-            <button className={"fchip" + (!cat ? " on" : "")} onClick={() => setCat("")}>Tudo</button>
-            {categories.map((c) => <button key={c} className={"fchip" + (cat === c ? " on" : "")} onClick={() => setCat(cat === c ? "" : c)}>{c}</button>)}
-          </>}
-          {tags.length > 0 && <span className="sep" />}
+      {categories.length > 0 && (
+        <div className="chipbar shopfilters hscroll" aria-label="Categorias">
+          <button className={"fchip" + (!cat ? " on" : "")} onClick={() => pickCat(cat)}>Tudo <b>{products.length}</b></button>
+          {categories.map((c) => <button key={c} className={"fchip" + (cat === c ? " on" : "")} onClick={() => pickCat(c)}>{c} <b>{countOf((p) => p.category === c)}</b></button>)}
+        </div>
+      )}
+      {types.length > 1 && (
+        <div className="chipbar shopfilters hscroll sub" aria-label="Tipos e modelos">
+          {types.map((t) => <button key={t} className={"fchip tag" + (type === t ? " on" : "")} onClick={() => { setType(type === t ? "" : t); setTag(""); }}>{t}</button>)}
+        </div>
+      )}
+      {tags.length > 0 && (
+        <div className="chipbar shopfilters hscroll sub" aria-label="Etiquetas">
           {tags.map((t) => <button key={t} className={"fchip tag" + (tag === t ? " on" : "")} onClick={() => setTag(tag === t ? "" : t)}>#{t}</button>)}
         </div>
       )}
-      {!filtered.length && <p className="muted center-text">Nenhum produto encontrado.</p>}
+      <div className="sortbar">
+        <small className="muted">{shown.length} {shown.length === 1 ? "produto" : "produtos"}</small>
+        <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Ordenar">
+          <option value="">Ordem da loja</option><option value="menor">Menor preço</option><option value="maior">Maior preço</option>
+        </select>
+        <label className="check"><input type="checkbox" checked={onlyAvail} onChange={(e) => setOnlyAvail(e.target.checked)} /> Só disponíveis</label>
+        {active && <button className="link" onClick={clear}>Limpar filtros</button>}
+      </div>
+      {!shown.length && <p className="muted center-text">Nenhum produto encontrado.</p>}
       <div className="grid products">
-        {filtered.map((p) => {
+        {shown.map((p) => {
           const imgs = [...p.product_images].sort((a, b) => a.position - b.position);
           const out = soldOut(p);
           const simple = vars(p).length === 0;
@@ -63,7 +89,7 @@ export default function Catalog({ slug, products, ratings }: { slug: string; pro
                 {out && <span className="ribbon">Esgotado</span>}
               </Link>
               <div className="pinfo2">
-                {p.category && <small className="pcat">{p.category}</small>}
+                {(p.subcategory || p.category) && <small className="pcat">{p.subcategory || p.category}</small>}
                 <Link href={`/${slug}/p/${p.id}`} className="pname">{p.name}</Link>
                 {ratings[p.id] && <Stars value={ratings[p.id].avg_rating} count={ratings[p.id].total} />}
                 <span className="price">{priceLabel(p)}</span>

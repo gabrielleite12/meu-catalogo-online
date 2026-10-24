@@ -173,7 +173,7 @@ export default function ProductView({ store, product: p, rating, reviews, relate
       <section id="avaliacoes" className="psec">
         <h2>Avaliações do produto</h2>
         {rating && <p><Stars value={rating.avg_rating} count={rating.total} /></p>}
-        {!reviews.length && <p className="muted">Sem avaliações ainda. Só clientes com pedido finalizado podem avaliar.</p>}
+        {!reviews.length && <p className="muted">Sem avaliações ainda. Só clientes com pedido entregue podem avaliar.</p>}
         {reviews.map((r) => (
           <div key={r.id} className="card rv"><div className="between"><strong>{r.reviewer_name}</strong><Stars value={r.rating} /></div>{r.comment && <p>{r.comment}</p>}<small className="muted">{new Date(r.created_at).toLocaleDateString("pt-BR")}</small></div>
         ))}

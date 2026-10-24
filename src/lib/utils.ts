@@ -10,6 +10,7 @@ export type Store = {
   id: string; owner_id: string; slug: string; name: string; description: string | null;
   category: string | null; whatsapp: string | null; city: string | null;
   payment_methods: string[]; delivery_methods: string[]; published: boolean; logo_url: string | null;
+  shipping_add_to_total: boolean; pickup_enabled: boolean;
 };
 export type Variant = { id: string; product_id: string; name: string; sku: string | null; price: number | null; stock: number | null; active: boolean; position: number; barcode: string | null; image_file_id: string | null };
 export type Template = { id: string; store_id: string | null; name: string; options: string[] };
@@ -18,7 +19,7 @@ export type Product = {
   track_stock: boolean; stock: number | null; active: boolean; position: number;
   product_images: { id: string; drive_file_id: string; position: number }[];
   sku: string | null; product_variants: Variant[];
-  category: string | null; tags: string[]; barcode: string | null; low_stock_alert: number | null;
+  category: string | null; subcategory: string | null; tags: string[]; barcode: string | null; low_stock_alert: number | null;
   hide_when_out: boolean; auto_hidden: boolean;
 };
 

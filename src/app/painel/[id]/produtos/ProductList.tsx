@@ -1,4 +1,5 @@
 "use client";
+import { PRESET_CATEGORIES, typesFor } from "@/lib/categories";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { bulkProducts, copyVariants, mergeProducts, deleteProduct, duplicateProduct, removeImage, toggleProduct, updateProduct } from "../../actions";
@@ -24,9 +25,11 @@ function stockInfo(p: Product) {
 const isOut = (p: Product) => { const s = stockInfo(p); return s.tracked && s.qty <= 0; };
 const isLow = (p: Product) => { const s = stockInfo(p); return s.tracked && s.qty > 0 && s.qty <= (p.low_stock_alert ?? 0); };
 
-function Editor({ p, rating, templates, categories, startVar }: {
-  p: Product; startVar?: boolean; rating?: { avg_rating: number; total: number }; templates: Template[]; categories: string[];
+function Editor({ p, rating, templates, categories, types, startVar }: {
+  p: Product; startVar?: boolean; rating?: { avg_rating: number; total: number }; templates: Template[]; categories: string[]; types: string[];
 }) {
+  const [catVal, setCatVal] = useState(p.category ?? "");
+  const typeOpts = [...new Set([...typesFor(catVal), ...types])];
   const [rows, setRows] = useState<Row[]>([...p.product_variants].sort((a, b) => a.position - b.position).map(toRow));
   const [groups, setGroups] = useState<Group[]>([{ name: "Tamanho", options: "" }, { name: "Cor", options: "" }]);
   const [track, setTrack] = useState(p.track_stock);
@@ -172,10 +175,10 @@ function Editor({ p, rating, templates, categories, startVar }: {
             {rows.map((r, i) => (
               <div className="vrow" key={r.id ?? i}>
                 <input value={r.name} onChange={(e) => set(i, "name", e.target.value)} placeholder="M / Azul" />
-                <input value={r.sku} onChange={(e) => set(i, "sku", e.target.value)} placeholder="SKU" />
-                <input value={r.barcode} onChange={(e) => set(i, "barcode", e.target.value)} placeholder="EAN" inputMode="numeric" />
-                <input value={r.price} onChange={(e) => set(i, "price", e.target.value)} placeholder="= produto" inputMode="decimal" />
-                <input value={r.stock} onChange={(e) => set(i, "stock", e.target.value)} placeholder="sem controle" inputMode="numeric" />
+                <label className="vf"><span className="vl">SKU</span><input value={r.sku} onChange={(e) => set(i, "sku", e.target.value)} placeholder="SKU" /></label>
+                <label className="vf"><span className="vl">Cód. barras</span><input value={r.barcode} onChange={(e) => set(i, "barcode", e.target.value)} placeholder="EAN" inputMode="numeric" /></label>
+                <label className="vf"><span className="vl">Preço</span><input value={r.price} onChange={(e) => set(i, "price", e.target.value)} placeholder="= produto" inputMode="decimal" /></label>
+                <label className="vf"><span className="vl">Estoque</span><input value={r.stock} onChange={(e) => set(i, "stock", e.target.value)} placeholder="sem controle" inputMode="numeric" /></label>
                 <span className="vimg">
                   {r.image && <img src={imgUrl(r.image) + "?s=80"} alt="" />}
                   <select value={r.image} onChange={(e) => set(i, "image", e.target.value)} aria-label="Foto da variação">
@@ -194,15 +197,19 @@ function Editor({ p, rating, templates, categories, startVar }: {
       )}
 
       <div className="row2">
-        <label>Categoria
-          <input name="category" list={`cats-${p.id}`} defaultValue={p.category ?? ""} placeholder="Ex.: Camisetas, Calçados…" />
-          <datalist id={`cats-${p.id}`}>{categories.map((c) => <option key={c} value={c} />)}</datalist>
+        <label>Categoria <small>ex.: Calçados, Roupas</small>
+          <input name="category" list={`cats-${p.id}`} value={catVal} onChange={(e) => setCatVal(e.target.value)} placeholder="Ex.: Calçados, Roupas…" />
+          <datalist id={`cats-${p.id}`}>{[...new Set([...categories, ...PRESET_CATEGORIES])].map((c) => <option key={c} value={c} />)}</datalist>
         </label>
-        <label>Tags <small>separe por vírgula: gênero, tipo, marca, cor…</small>
-          <input name="tags" list={`tags-${p.id}`} defaultValue={p.tags.join(", ")} placeholder="Masculino, Camiseta, Nike" />
-          <datalist id={`tags-${p.id}`}>{SUGGEST_TAGS.map((t) => <option key={t} value={t} />)}</datalist>
+        <label>Tipo / modelo <small>ex.: Tênis, Camiseta</small>
+          <input name="subcategory" list={`types-${p.id}`} defaultValue={p.subcategory ?? ""} placeholder="Ex.: Tênis, Vestido…" />
+          <datalist id={`types-${p.id}`}>{typeOpts.map((c) => <option key={c} value={c} />)}</datalist>
         </label>
       </div>
+      <label>Etiquetas <small>separe por vírgula: gênero, marca, cor…</small>
+        <input name="tags" list={`tags-${p.id}`} defaultValue={p.tags.join(", ")} placeholder="Masculino, Nike, Verão" />
+        <datalist id={`tags-${p.id}`}>{SUGGEST_TAGS.map((t) => <option key={t} value={t} />)}</datalist>
+      </label>
       <div className="row2">
         <label>Preço (opcional)<input name="price" defaultValue={p.price ?? ""} inputMode="decimal" placeholder="0,00" /></label>
         <label>Código de barras<input name="barcode" defaultValue={p.barcode ?? ""} placeholder="Opcional" inputMode="numeric" /></label>
@@ -241,31 +248,34 @@ export default function ProductList({ products, storeId, ratings, templates }: {
   const [varFor, setVarFor] = useState<string | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [bulkVal, setBulkVal] = useState("");
+  const [type, setType] = useState("");
   const [pending, start] = useTransition();
 
   const norm = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean) as string[])].sort(), [products]);
+  const types = useMemo(() => [...new Set(products.map((p) => p.subcategory).filter(Boolean) as string[])].sort(), [products]);
   const tags = useMemo(() => [...new Set(products.flatMap((p) => p.tags))].sort(), [products]);
   const counts = useMemo(() => ({
     todos: products.length, visiveis: products.filter((p) => p.active).length, ocultos: products.filter((p) => !p.active).length,
-    sem: products.filter(isOut).length, baixo: products.filter(isLow).length,
+    sem: products.filter(isOut).length, baixo: products.filter(isLow).length, semcat: products.filter((p) => !p.category).length,
   }), [products]);
 
   const list = useMemo(() => products.filter((p) => {
-    const hay = norm([p.name, p.sku, p.barcode, p.category, ...p.tags, ...p.product_variants.flatMap((v) => [v.sku, v.barcode])].filter(Boolean).join(" "));
+    const hay = norm([p.name, p.sku, p.barcode, p.category, p.subcategory, ...p.tags, ...p.product_variants.flatMap((v) => [v.sku, v.barcode])].filter(Boolean).join(" "));
     if (q && !hay.includes(norm(q))) return false;
-    if (cat && p.category !== cat) return false;
+    if (cat === "__sem") { if (p.category) return false; } else if (cat && p.category !== cat) return false;
+    if (type && p.subcategory !== type) return false;
     if (tag && !p.tags.includes(tag)) return false;
     if (filter === "visiveis") return p.active;
     if (filter === "ocultos") return !p.active;
     if (filter === "sem") return isOut(p);
     if (filter === "baixo") return isLow(p);
     return true;
-  }), [products, q, cat, tag, filter]);
+  }), [products, q, cat, type, tag, filter]);
 
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const all = list.length > 0 && list.every((p) => sel.has(p.id));
-  const bulk = (action: "delete" | "hide" | "show" | "category" | "tags_add", value?: string) => {
+  const bulk = (action: "delete" | "hide" | "show" | "category" | "subcategory" | "tags_add", value?: string) => {
     if (action === "delete" && !confirm(`Excluir ${sel.size} produto(s)? Isso não pode ser desfeito.`)) return;
     start(async () => { await bulkProducts({ ids: [...sel], action, value }); setSel(new Set()); setBulkVal(""); });
   };
@@ -295,7 +305,8 @@ export default function ProductList({ products, storeId, ratings, templates }: {
       </div>
       <div className="toolbar">
         <input placeholder="Buscar nome, SKU, código de barras, categoria ou tag…" value={q} onChange={(e) => setQ(e.target.value)} />
-        {categories.length > 0 && <select value={cat} onChange={(e) => setCat(e.target.value)}><option value="">Todas as categorias</option>{categories.map((c) => <option key={c}>{c}</option>)}</select>}
+        {(categories.length > 0 || counts.semcat > 0) && <select value={cat} onChange={(e) => setCat(e.target.value)}><option value="">Todas as categorias</option>{categories.map((c) => <option key={c}>{c}</option>)}{counts.semcat > 0 && <option value="__sem">Sem categoria ({counts.semcat})</option>}</select>}
+        {types.length > 0 && <select value={type} onChange={(e) => setType(e.target.value)}><option value="">Todos os tipos</option>{types.map((c) => <option key={c}>{c}</option>)}</select>}
         {tags.length > 0 && <select value={tag} onChange={(e) => setTag(e.target.value)}><option value="">Todas as tags</option>{tags.map((t) => <option key={t}>{t}</option>)}</select>}
         <label className="check"><input type="checkbox" checked={all} onChange={() => setSel(all ? new Set() : new Set(list.map((p) => p.id)))} /> Selecionar todos</label>
       </div>
@@ -305,9 +316,10 @@ export default function ProductList({ products, storeId, ratings, templates }: {
           {pending && <span className="spin" />}
           <button className="btn sm" disabled={pending} onClick={() => bulk("show")}>Mostrar</button>
           <button className="btn sm" disabled={pending} onClick={() => bulk("hide")}>Ocultar</button>
-          <input value={bulkVal} onChange={(e) => setBulkVal(e.target.value)} placeholder="Categoria ou tags" />
+          <input value={bulkVal} onChange={(e) => setBulkVal(e.target.value)} placeholder="Categoria, tipo ou etiquetas" />
           <button className="btn sm" disabled={pending || !bulkVal.trim()} onClick={() => bulk("category", bulkVal)}>Definir categoria</button>
-          <button className="btn sm" disabled={pending || !bulkVal.trim()} onClick={() => bulk("tags_add", bulkVal)}>Adicionar tags</button>
+          <button className="btn sm" disabled={pending || !bulkVal.trim()} onClick={() => bulk("subcategory", bulkVal)}>Definir tipo</button>
+          <button className="btn sm" disabled={pending || !bulkVal.trim()} onClick={() => bulk("tags_add", bulkVal)}>Adicionar etiquetas</button>
           <button className="btn sm" disabled={pending || sel.size < 2} onClick={() => merge()}
             title="As fotos dos demais vão para o primeiro da lista e os demais são removidos">Juntar em um produto</button>
           <button className="btn sm" disabled={pending || sel.size < 2} onClick={() => copyVars()}
@@ -330,7 +342,7 @@ export default function ProductList({ products, storeId, ratings, templates }: {
                   <span className="pthumb">{imgs[0] ? <img src={imgUrl(imgs[0].drive_file_id) + "?s=160"} alt="" loading="lazy" /> : null}</span>
                   <span className="pinfo">
                     <b>{p.name}</b>
-                    <small className="muted">{[p.category, p.sku && `SKU ${p.sku}`, p.price != null && `R$ ${Number(p.price).toFixed(2).replace(".", ",")}`, si.label].filter(Boolean).join(" · ")}</small>
+                    <small className="muted">{[p.category, p.subcategory, p.sku && `SKU ${p.sku}`, p.price != null && `R$ ${Number(p.price).toFixed(2).replace(".", ",")}`, si.label].filter(Boolean).join(" · ")}</small>
                     <span className="badges">
                       {!p.active && <i className="bd off">{p.auto_hidden ? "oculto · sem estoque" : "oculto"}</i>}
                       {isOut(p) && <i className="bd out">sem estoque</i>}
@@ -365,7 +377,7 @@ export default function ProductList({ products, storeId, ratings, templates }: {
                     ))}
                     <Link className="thumb add" href={`/painel/${storeId}/importar?produto=${p.id}`} title="Adicionar fotos">+</Link>
                   </div>
-                  <Editor key={`${p.id}-${varFor === p.id}`} p={p} startVar={varFor === p.id} rating={ratings[p.id]} templates={templates} categories={categories} />
+                  <Editor key={`${p.id}-${varFor === p.id}`} p={p} startVar={varFor === p.id} rating={ratings[p.id]} templates={templates} categories={categories} types={types} />
                 </div>
               )}
             </div>
