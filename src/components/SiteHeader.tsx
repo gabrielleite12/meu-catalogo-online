@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { signOut } from "@/app/painel/actions";
+import NotifyButton from "@/components/NotifyButton";
 
 export default async function SiteHeader() {
   const supabase = await supabaseServer();
@@ -39,6 +40,7 @@ export default async function SiteHeader() {
             <Link href="/painel">🏬 Meus catálogos{pending > 0 && <span className="dot">{pending} novo(s)</span>}</Link>
             <Link href="/painel/novo">➕ Novo catálogo</Link>
             <Link href="/conta">👤 Minha conta e pedidos</Link>
+            <NotifyButton />
             <Link href="/ajuda">❓ Ajuda</Link>
             <form action={signOut}><button>↩ Sair</button></form>
           </div>

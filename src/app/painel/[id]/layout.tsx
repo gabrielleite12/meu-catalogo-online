@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import StoreTabs from "@/components/StoreTabs";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export default async function StoreLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
@@ -17,12 +18,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
         </div>
         <Link className="btn" href={`/${store.slug}`} target="_blank">Ver catálogo ↗</Link>
       </div>
-      <nav className="tabs">
-        <Link href={`/painel/${id}`}>Configurações</Link>
-        <Link href={`/painel/${id}/produtos`}>Produtos</Link>
-        <Link href={`/painel/${id}/importar`}>Importar do Drive</Link>
-        <Link href={`/painel/${id}/pedidos`}>Pedidos{!!count && <span className="dot">{count}</span>}</Link>
-      </nav>
+      <StoreTabs id={id} pending={count ?? 0} />
       {children}
     </>
   );

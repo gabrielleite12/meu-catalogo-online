@@ -21,7 +21,7 @@ export default function Termos() {
         <ul>
           <li>O acesso é feito com conta Google. Você é responsável pelas informações que cadastra.</li>
           <li>Lojistas só devem publicar fotos e informações que tenham o direito de usar, e não podem anunciar produtos ilegais ou enganosos.</li>
-          <li>Avaliações só podem ser feitas por clientes com pedido finalizado e devem refletir a experiência real. Podemos remover conteúdo ofensivo ou fraudulento.</li>
+          <li>Avaliações só podem ser feitas por clientes com pedido entregue e devem refletir a experiência real. Podemos remover conteúdo ofensivo ou fraudulento.</li>
         </ul>
 
         <h2>4. Google Drive</h2>
