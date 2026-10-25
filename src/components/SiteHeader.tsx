@@ -23,7 +23,10 @@ export default async function SiteHeader() {
 
   return (
     <header className="top">
-      <Link href="/" className="logo">Expositor</Link>
+      <Link href="/" className="logo" aria-label="Vitrine Zap — página inicial">
+        <img src="/icons/icon-192.png" alt="" width={34} height={34} />
+        <span className="lw">Vitrine<b>Zap</b></span>
+      </Link>
       <nav>
         <Link href="/">Buscar lojas</Link>
         <Link href="/ajuda">Como funciona</Link>

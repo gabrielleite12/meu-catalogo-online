@@ -3,10 +3,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "Como funciona — Expositor",
+  title: "Como funciona — Vitrine Zap",
   description: "Passo a passo com telas: criar o catálogo, cadastrar produtos e estoque, configurar fretes, atender pedidos, agendar entregas, devoluções e como comprar.",
   alternates: { canonical: "/ajuda" },
-  openGraph: { title: "Como funciona — Expositor", description: "Crie seu catálogo com fotos do Google Drive e receba pedidos pelo WhatsApp.", type: "website" as const },
+  openGraph: { title: "Como funciona — Vitrine Zap", description: "Crie seu catálogo com fotos do Google Drive e receba pedidos pelo WhatsApp.", type: "website" as const },
 };
 
 type Step = { id: string; title: string; img?: string; alt?: string; cap?: string; body: ReactNode };
@@ -251,7 +251,7 @@ const owner: Step[] = [
   {
     id: "app-dono", title: "Instale o app e ligue os avisos",
     body: (<>
-      <p>O Expositor funciona como app: no Android, toque em <b>Instalar</b> no banner (ou menu do navegador → <i>Instalar app</i>). No iPhone, toque em <i>Compartilhar → Adicionar à Tela de Início</i>.</p>
+      <p>A Vitrine Zap funciona como app: no Android, toque em <b>Instalar</b> no banner (ou menu do navegador → <i>Instalar app</i>). No iPhone, toque em <i>Compartilhar → Adicionar à Tela de Início</i>.</p>
       <p>Depois, abra o menu do seu perfil e toque em <b>🔔 Ativar avisos</b>. Você será avisado de <b>novo pedido</b>, de <b>entrega confirmada</b> pelo cliente e de <b>cancelamento</b>.</p>
       <Tip>No iPhone, os avisos só funcionam depois de instalar o app pela Tela de Início.</Tip>
     </>),
@@ -314,7 +314,7 @@ const buyer: Step[] = [
   {
     id: "c-app", title: "Instale o app e receba avisos",
     body: (<>
-      <p>Instale o Expositor na tela inicial (Android: <b>Instalar</b>; iPhone: <i>Compartilhar → Adicionar à Tela de Início</i>) e, em <i>Minha conta</i>, toque em <b>Ativar avisos</b> para saber quando o pedido sair para entrega e qual dia foi combinado.</p>
+      <p>Instale a Vitrine Zap na tela inicial (Android: <b>Instalar</b>; iPhone: <i>Compartilhar → Adicionar à Tela de Início</i>) e, em <i>Minha conta</i>, toque em <b>Ativar avisos</b> para saber quando o pedido sair para entrega e qual dia foi combinado.</p>
     </>),
   },
 ];
@@ -351,7 +351,7 @@ export default function Ajuda() {
       <SiteHeader />
       <main className="wrap help">
         <header className="hhero">
-          <h1>Como funciona o Expositor</h1>
+          <h1>Como funciona a Vitrine Zap</h1>
           <p>Passo a passo com as telas do app — para quem vende e para quem compra.</p>
           <nav className="hnav" aria-label="Seções da ajuda">
             <a href="#lojistas">🏬 Sou lojista</a>
@@ -433,7 +433,7 @@ export default function Ajuda() {
           </div>
           <div className="card note">
             <h3>Aviso “O Google não verificou este app”</h3>
-            <p>Em modo de teste isso é normal: toque em <i>Avançado → Acessar Expositor (não seguro)</i> e continue. Depois de publicado, o aviso não aparece.</p>
+            <p>Em modo de teste isso é normal: toque em <i>Avançado → Acessar Vitrine Zap (não seguro)</i> e continue. Depois de publicado, o aviso não aparece.</p>
           </div>
           <div className="card note">
             <h3>As fotos não aparecem depois de reconectar o Drive</h3>

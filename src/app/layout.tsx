@@ -4,10 +4,10 @@ import "./globals.css";
 import PwaRegister from "@/components/PwaRegister";
 
 export const metadata: Metadata = {
-  title: "Expositor — catálogos online com suas fotos do Drive",
+  title: "Vitrine Zap — catálogos online com suas fotos do Drive",
   description: "Monte seu catálogo com as fotos do Google Drive e receba pedidos pelo WhatsApp.",
-  applicationName: "Expositor",
-  appleWebApp: { capable: true, title: "Expositor", statusBarStyle: "default" },
+  applicationName: "Vitrine Zap",
+  appleWebApp: { capable: true, title: "Vitrine Zap", statusBarStyle: "default" },
   icons: { icon: [{ url: "/icons/icon-192.png", sizes: "192x192" }, { url: "/icons/icon-512.png", sizes: "512x512" }], apple: "/icons/apple-touch-icon.png" },
   formatDetection: { telephone: false },
 };

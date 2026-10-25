@@ -1,7 +1,7 @@
 import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 
-export const metadata = { title: "Termos de Serviço — Expositor" };
+export const metadata = { title: "Termos de Serviço — Vitrine Zap" };
 
 export default function Termos() {
   return (
@@ -12,10 +12,10 @@ export default function Termos() {
         <p className="muted">Última atualização: 16 de outubro de 2026</p>
 
         <h2>1. O serviço</h2>
-        <p>O Expositor permite que lojistas criem catálogos online com suas fotos e recebam pedidos pelo WhatsApp, e que clientes consultem catálogos, façam pedidos e avaliem lojas. Ao usar o serviço, você concorda com estes termos.</p>
+        <p>A Vitrine Zap permite que lojistas criem catálogos online com suas fotos e recebam pedidos pelo WhatsApp, e que clientes consultem catálogos, façam pedidos e avaliem lojas. Ao usar o serviço, você concorda com estes termos.</p>
 
         <h2>2. Somos uma vitrine</h2>
-        <p>O Expositor <b>não processa pagamentos, não entrega produtos e não é parte das vendas</b>. Preço, pagamento, entrega, troca e garantia são combinados diretamente entre cliente e loja. A loja é a única responsável pelos produtos, preços, estoque e atendimento.</p>
+        <p>A Vitrine Zap <b>não processa pagamentos, não entrega produtos e não é parte das vendas</b>. Preço, pagamento, entrega, troca e garantia são combinados diretamente entre cliente e loja. A loja é a única responsável pelos produtos, preços, estoque e atendimento.</p>
 
         <h2>3. Conta e conteúdo</h2>
         <ul>

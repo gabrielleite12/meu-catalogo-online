@@ -378,3 +378,10 @@ html{scroll-behavior:smooth}
 .gloss{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin:0}
 .gloss .card{padding:14px 16px}.gloss dt{font-weight:700;margin-bottom:4px}.gloss dd{margin:0;color:var(--ink)}
 @media(max-width:560px){.sty{grid-template-columns:1fr;gap:4px}}
+
+/* Logo Vitrine Zap */
+.logo{display:inline-flex;align-items:center;gap:9px;color:#0e2a1f}
+.logo img{display:block;width:34px;height:34px;border-radius:9px}
+.logo .lw{font-weight:800;font-size:21px;letter-spacing:-.03em;line-height:1}
+.logo .lw b{color:#1faa59;font-weight:800;margin-left:3px}
+@media(max-width:420px){.logo .lw{font-size:18px}.logo img{width:30px;height:30px}}

@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Expositor — catálogos online",
-    short_name: "Expositor",
+    name: "Vitrine Zap — catálogos online",
+    short_name: "Vitrine Zap",
     description: "Catálogos online, pedidos pelo WhatsApp e controle de entregas.",
     start_url: "/?source=pwa",
     scope: "/",
