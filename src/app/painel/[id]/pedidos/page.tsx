@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { brl, imgUrl } from "@/lib/utils";
+import { brl } from "@/lib/utils";
+import ItemPhoto from "@/components/ItemPhoto";
 import { itemPhotos } from "@/lib/orderImages";
 import { buildStoreReply, cancelLine, deliveryLine, timeAgo, timeline, todayBR, whatsappLink } from "@/lib/orders";
 import { setOrderStatus, returnItems, scheduleDelivery } from "../../actions";
@@ -89,7 +90,7 @@ export default async function Pedidos({ params, searchParams }: {
               const left = i.qty - i.qty_returned;
               return (
                 <div className="retrow" key={i.id}>
-                  <span className="itrow"><span className="pthumb">{photos.get(i.id) ? <img src={imgUrl(photos.get(i.id)!) + "?s=160"} alt="" loading="lazy" /> : null}</span><span>{label(i)}<small className="muted"> · pediu {i.qty}{i.qty_returned ? `, já devolveu ${i.qty_returned}` : ""}</small></span></span>
+                  <span className="itrow"><ItemPhoto file={photos.get(i.id)} alt={label(i)} /><span>{label(i)}<small className="muted"> · pediu {i.qty}{i.qty_returned ? `, já devolveu ${i.qty_returned}` : ""}</small></span></span>
                   {left > 0 ? (
                     <>
                       <input type="number" name={"qty_" + i.id} min={0} max={left} defaultValue={0} aria-label={`Devolvidos de ${i.name}`} />
@@ -146,7 +147,7 @@ export default async function Pedidos({ params, searchParams }: {
               <ul className="items">
                 {items.map((i) => (
                   <li key={i.id} className="itrow">
-                    <span className="pthumb">{photos.get(i.id) ? <img src={imgUrl(photos.get(i.id)!) + "?s=160"} alt={label(i)} loading="lazy" /> : null}</span>
+                    <ItemPhoto file={photos.get(i.id)} alt={label(i)} />
                     <span>{i.qty}× {label(i)} <span className="muted">{i.price != null ? brl(i.price * i.qty) : "sob consulta"}</span>
                       {i.qty_returned > 0 && <small className="ret"> ↩ {i.qty_returned} devolvido(s)</small>}</span>
                   </li>

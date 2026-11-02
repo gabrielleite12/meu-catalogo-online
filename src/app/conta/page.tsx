@@ -1,7 +1,8 @@
 import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { brl, imgUrl, safeNext } from "@/lib/utils";
+import { brl, safeNext } from "@/lib/utils";
+import ItemPhoto from "@/components/ItemPhoto";
 import { itemPhotos } from "@/lib/orderImages";
 import ProfileForm from "./ProfileForm";
 import ReviewForm from "./ReviewForm";
@@ -67,7 +68,7 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
               <ul className="items">
                 {o.order_items.map((i: Item) => (
                   <li key={i.id} className="itrow">
-                    <span className="pthumb">{photos.get(i.id) ? <img src={imgUrl(photos.get(i.id)!) + "?s=160"} alt={i.name} loading="lazy" /> : null}</span>
+                    <ItemPhoto file={photos.get(i.id)} alt={`${i.name}${i.variant_name ? ` (${i.variant_name})` : ""}`} />
                     <span className="itbody">
                     {i.qty}× {i.name}{i.variant_name ? ` (${i.variant_name})` : ""}
                     {i.qty_returned > 0 && <small className="muted"> · {i.qty_returned} devolvido(s)</small>}
