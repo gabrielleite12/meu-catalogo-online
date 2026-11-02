@@ -1,7 +1,8 @@
 import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { brl, safeNext } from "@/lib/utils";
+import { brl, imgUrl, safeNext } from "@/lib/utils";
+import { itemPhotos } from "@/lib/orderImages";
 import ProfileForm from "./ProfileForm";
 import ReviewForm from "./ReviewForm";
 import { reviewStore, reviewProduct, cancelMyOrder, confirmDelivery } from "./actions";
@@ -10,7 +11,7 @@ import NotifyButton from "@/components/NotifyButton";
 import { cancelLine, deliveryLine, timeline } from "@/lib/orders";
 
 const LABEL: Record<string, string> = { novo: "Aguardando a loja", aprovado: "Aprovado", enviado: "A caminho", finalizado: "Entregue", cancelado: "Cancelado", devolvido: "Devolvido" };
-type Item = { id: string; product_id: string | null; name: string; variant_name?: string | null; price: number | null; qty: number; qty_returned: number };
+type Item = { id: string; product_id: string | null; variant_id?: string | null; name: string; variant_name?: string | null; price: number | null; qty: number; qty_returned: number };
 
 export default async function Conta({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
@@ -19,12 +20,13 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
   const { data: u } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", u.user!.id).maybeSingle();
   const { data: orders, error: ordersError } = await supabase
-    .from("orders").select("*, stores(name,slug), order_items(id,product_id,name,variant_name,price,qty,qty_returned)")
+    .from("orders").select("*, stores(name,slug), order_items(id,product_id,variant_id,name,variant_name,price,qty,qty_returned)")
     .eq("customer_id", u.user!.id).order("created_at", { ascending: false }).limit(50);
   const ids = (orders ?? []).map((o) => o.id);
   const { data: sr } = ids.length ? await supabase.from("store_reviews").select("order_id").in("order_id", ids) : { data: [] };
   const itemIds = (orders ?? []).flatMap((o) => o.order_items.map((i: Item) => i.id));
   const { data: pr } = itemIds.length ? await supabase.from("product_reviews").select("order_item_id").in("order_item_id", itemIds) : { data: [] };
+  const photos = await itemPhotos(supabase, (orders ?? []).flatMap((o) => o.order_items as Item[]));
   const storeDone = new Set((sr ?? []).map((r) => r.order_id));
   const itemDone = new Set((pr ?? []).map((r) => r.order_item_id));
 
@@ -64,13 +66,16 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
                 : o.shipping_label && <p className="freteline"><span>🚚 {o.shipping_label}</span><b>{o.shipping_fee ? `${brl(o.shipping_fee)}${o.shipping_added ? "" : " (à parte)"}` : ""}</b></p>}
               <ul className="items">
                 {o.order_items.map((i: Item) => (
-                  <li key={i.id}>
+                  <li key={i.id} className="itrow">
+                    <span className="pthumb">{photos.get(i.id) && <img src={imgUrl(photos.get(i.id)!) + "?s=160"} alt={i.name} loading="lazy" />}</span>
+                    <span className="itbody">
                     {i.qty}× {i.name}{i.variant_name ? ` (${i.variant_name})` : ""}
                     {i.qty_returned > 0 && <small className="muted"> · {i.qty_returned} devolvido(s)</small>}
                     {o.status === "finalizado" && i.product_id && !itemDone.has(i.id) && (
                       <ReviewForm action={reviewProduct} fields={{ item_id: i.id }} label={`Avaliar ${i.name}`} />
                     )}
                     {itemDone.has(i.id) && <small className="ok"> ✓ avaliado</small>}
+                    </span>
                   </li>
                 ))}
               </ul>

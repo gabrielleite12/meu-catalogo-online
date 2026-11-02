@@ -350,3 +350,9 @@ h2{letter-spacing:-.01em}
 .tplrow>span{flex:1;min-width:0}.tplrow>span .muted{white-space:nowrap;font-size:.85rem}
 @media(max-width:640px){.tplrow input{max-width:130px}}
 .shipbox input[type=radio]{width:auto;flex:none;margin:0}.shipbox .pick label{white-space:nowrap}
+
+/* foto do item nos pedidos */
+.items li.itrow,.itrow{display:flex;gap:10px;align-items:center;list-style:none}
+.items:has(.itrow){padding-left:0}
+.itrow .pthumb{width:56px;height:56px}
+.itrow .itbody{min-width:0;flex:1}

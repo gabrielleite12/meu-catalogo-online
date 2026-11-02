@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { brl } from "@/lib/utils";
+import { brl, imgUrl } from "@/lib/utils";
+import { itemPhotos } from "@/lib/orderImages";
 import { buildStoreReply, cancelLine, deliveryLine, timeAgo, timeline, todayBR, whatsappLink } from "@/lib/orders";
 import { setOrderStatus, returnItems, scheduleDelivery } from "../../actions";
 import NotifyButton from "@/components/NotifyButton";
@@ -8,10 +9,10 @@ import SubmitButton from "@/components/SubmitButton";
 
 const LABEL: Record<string, string> = { novo: "Novo", aprovado: "Aprovado", enviado: "Em trânsito", finalizado: "Entregue", cancelado: "Cancelado", devolvido: "Devolvido" };
 const FILTERS = [["novo", "Novos"], ["aprovado", "Aprovados"], ["hoje", "📅 Entrega hoje"], ["enviado", "Em trânsito"], ["finalizado", "Entregues"], ["cancelado", "Cancelados"], ["devolvido", "Devolvidos"], ["todos", "Todos"]] as const;
-type Item = { id: string; name: string; variant_name?: string | null; price: number | null; qty: number; qty_returned: number };
+type Item = { id: string; product_id?: string | null; variant_id?: string | null; name: string; variant_name?: string | null; price: number | null; qty: number; qty_returned: number };
 type Ret = { id: string; order_item_id: string; qty: number; restocked: boolean; reason: string | null };
 const label = (i: { name: string; variant_name?: string | null }) => `${i.name}${i.variant_name ? ` (${i.variant_name})` : ""}`;
-const SELECT = "*, order_items(id,name,variant_name,price,qty,qty_returned), order_returns(id,order_item_id,qty,restocked,reason)";
+const SELECT = "*, order_items(id,product_id,variant_id,name,variant_name,price,qty,qty_returned), order_returns(id,order_item_id,qty,restocked,reason)";
 
 export default async function Pedidos({ params, searchParams }: {
   params: Promise<{ id: string }>; searchParams: Promise<{ s?: string; q?: string; devolver?: string; erro?: string; ok?: string }>;
@@ -29,6 +30,7 @@ export default async function Pedidos({ params, searchParams }: {
       : Promise.resolve({ data: null }),
   ]);
   const all = data ?? [];
+  const photos = await itemPhotos(supabase, all.flatMap((o) => o.order_items as Item[]));
   const today = todayBR();
   const open = (o: { status: string }) => o.status === "novo" || o.status === "aprovado" || o.status === "enviado";
   const isToday = (o: { status: string; delivery_date: string | null }) => open(o) && o.delivery_date === today;
@@ -87,7 +89,7 @@ export default async function Pedidos({ params, searchParams }: {
               const left = i.qty - i.qty_returned;
               return (
                 <div className="retrow" key={i.id}>
-                  <span>{label(i)}<small className="muted"> · pediu {i.qty}{i.qty_returned ? `, já devolveu ${i.qty_returned}` : ""}</small></span>
+                  <span className="itrow"><span className="pthumb">{photos.get(i.id) && <img src={imgUrl(photos.get(i.id)!) + "?s=160"} alt="" loading="lazy" />}</span><span>{label(i)}<small className="muted"> · pediu {i.qty}{i.qty_returned ? `, já devolveu ${i.qty_returned}` : ""}</small></span></span>
                   {left > 0 ? (
                     <>
                       <input type="number" name={"qty_" + i.id} min={0} max={left} defaultValue={0} aria-label={`Devolvidos de ${i.name}`} />
@@ -143,8 +145,11 @@ export default async function Pedidos({ params, searchParams }: {
               )}
               <ul className="items">
                 {items.map((i) => (
-                  <li key={i.id}>{i.qty}× {label(i)} <span className="muted">{i.price != null ? brl(i.price * i.qty) : "sob consulta"}</span>
-                    {i.qty_returned > 0 && <small className="ret"> ↩ {i.qty_returned} devolvido(s)</small>}</li>
+                  <li key={i.id} className="itrow">
+                    <span className="pthumb">{photos.get(i.id) && <img src={imgUrl(photos.get(i.id)!) + "?s=160"} alt={label(i)} loading="lazy" />}</span>
+                    <span>{i.qty}× {label(i)} <span className="muted">{i.price != null ? brl(i.price * i.qty) : "sob consulta"}</span>
+                      {i.qty_returned > 0 && <small className="ret"> ↩ {i.qty_returned} devolvido(s)</small>}</span>
+                  </li>
                 ))}
               </ul>
               {(o.order_returns as Ret[]).length > 0 && (
