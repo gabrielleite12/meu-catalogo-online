@@ -33,7 +33,7 @@ export default function PwaRegister() {
     <div className="install" role="dialog" aria-label="Instalar o app">
       <img src="/icons/icon-192.png" alt="" width={44} height={44} />
       <div className="it">
-        <b>Instale o Expositor</b>
+        <b>Instale a Vitrine Zap</b>
         <small>{evt ? "Abra como um app, com avisos de pedidos." : "Toque em Compartilhar e depois em “Adicionar à Tela de Início”."}</small>
       </div>
       {evt && <button className="btn primary sm" onClick={async () => { await evt.prompt(); await evt.userChoice; setEvt(null); close(); }}>Instalar</button>}

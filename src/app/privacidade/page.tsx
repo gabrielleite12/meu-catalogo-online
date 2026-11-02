@@ -1,7 +1,7 @@
 import SiteHeader from "@/components/SiteHeader";
 import Link from "next/link";
 
-export const metadata = { title: "Política de Privacidade — Expositor" };
+export const metadata = { title: "Política de Privacidade — Vitrine Zap" };
 
 export default function Privacidade() {
   return (
@@ -10,7 +10,7 @@ export default function Privacidade() {
       <main className="wrap prose">
         <h1>Política de Privacidade</h1>
         <p className="muted">Última atualização: 16 de outubro de 2026</p>
-        <p>O Expositor é uma plataforma gratuita para criar catálogos online e receber pedidos pelo WhatsApp. Esta política explica quais dados usamos e por quê.</p>
+        <p>A Vitrine Zap é uma plataforma gratuita para criar catálogos online e receber pedidos pelo WhatsApp. Esta política explica quais dados usamos e por quê.</p>
 
         <h2>Dados que coletamos</h2>
         <ul>

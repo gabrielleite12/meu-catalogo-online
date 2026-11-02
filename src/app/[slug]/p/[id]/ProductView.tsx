@@ -39,6 +39,13 @@ export default function ProductView({ store, product: p, rating, reviews, relate
     info.vs.find((x) => info.colorOf(x) === c && (!s || info.sizeOf(x) === s) && x.image_file_id)?.image_file_id ?? info.vs.find((x) => info.colorOf(x) === c && x.image_file_id)?.image_file_id;
   useEffect(() => { if (v?.image_file_id) showFile(v.image_file_id); /* eslint-disable-next-line */ }, [v?.id]);
 
+  // ao trocar a cor, mantém o tamanho só se essa combinação existir; senão limpa para o cliente escolher de novo
+  const pickColor = (c: string) => {
+    const next = color === c ? "" : c;
+    setColor(next);
+    if (next && size && info.kind === "two" && !info.find(size, next)) setSize("");
+    if (next) showFile(photoOfColor(next, size));
+  };
   const colorOut = (c: string) => info.vs.filter((x) => info.colorOf(x) === c).every((x) => avail(p, x) <= 0);
   const sizeState = (s: string) => {
     const pool = info.vs.filter((x) => info.sizeOf(x) === s && (!color || info.colorOf(x) === color));
@@ -59,7 +66,7 @@ export default function ProductView({ store, product: p, rating, reviews, relate
         <span className="qty big"><button onClick={() => cart.set(p, v, n - 1)} aria-label="menos">−</button><b>{n}</b><button onClick={() => cart.set(p, v, n + 1)} disabled={n >= avail(p, v)} aria-label="mais">+</button></span>
       ) : (
         <button className="btn primary buy" disabled={!ready || out} onClick={addToCart}>
-          {out && ready ? "Esgotado" : !ready ? needs : "Adicionar ao pedido"}
+          {out && ready ? "Esgotado" : !ready ? needs || "Combinação indisponível" : "Adicionar ao pedido"}
         </button>
       )}
       {(cart.count > 0) && <button className="btn viewcart" onClick={cart.openCart} aria-label="Ver pedido">🛒 {cart.count}</button>}
@@ -106,7 +113,7 @@ export default function ProductView({ store, product: p, rating, reviews, relate
                     const f = photoOfColor(c);
                     return (
                       <button key={c} className={"sw" + (color === c ? " on" : "") + (colorOut(c) ? " out" : "")} title={c}
-                        onClick={() => { const next = color === c ? "" : c; setColor(next); if (next) showFile(photoOfColor(next, size)); }}>
+                        onClick={() => pickColor(c)}>
                         {f ? <img src={imgUrl(f) + "?s=120"} alt={c} /> : <span className="swt">{c}</span>}
                         {f && <small>{c}</small>}
                       </button>
