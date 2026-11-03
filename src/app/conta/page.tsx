@@ -3,6 +3,8 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { brl, safeNext } from "@/lib/utils";
 import ItemPhoto from "@/components/ItemPhoto";
+import MiniPhotos from "@/components/MiniPhotos";
+import OrderSteps from "@/components/OrderSteps";
 import { itemPhotos } from "@/lib/orderImages";
 import ProfileForm from "./ProfileForm";
 import ReviewForm from "./ReviewForm";
@@ -51,12 +53,18 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
         {!orders?.length && !ordersError && <p className="muted">Você ainda não fez pedidos.</p>}
         <div className="stack">
           {(orders ?? []).map((o) => (
-            <div className="card prod" key={o.id}>
-              <div className="between">
-                <strong><Link href={`/${o.stores.slug}`}>{o.stores.name}</Link> · #{o.code}</strong>
-                <span className={"status " + o.status}>{LABEL[o.status]}</span>
-              </div>
-              <p className="muted">{new Date(o.created_at).toLocaleString("pt-BR")}{o.total ? ` · ${brl(o.total)}` : ""}</p>
+            <details className="card prod ord" key={o.id} open={o.status === "enviado" || o.status === "novo" || (orders ?? []).length === 1}>
+              <summary className="osum">
+                <MiniPhotos files={o.order_items.map((i: Item) => photos.get(i.id))} />
+                <span className="otxt">
+                  <b>{o.stores.name} · #{o.code}</b>
+                  <small className="muted">{o.order_items.reduce((a: number, i: Item) => a + i.qty, 0)} item(ns) · {new Date(o.created_at).toLocaleDateString("pt-BR")}</small>
+                </span>
+                <span className="oright"><span className={"status " + o.status}>{LABEL[o.status]}</span><b>{o.total ? brl(o.total) : ""}</b></span>
+              </summary>
+              <div className="obody">
+              <p className="muted"><Link href={`/${o.stores.slug}`}>Ver a loja {o.stores.name}</Link> · feito em {new Date(o.created_at).toLocaleString("pt-BR")}</p>
+              <OrderSteps status={o.status} />
               {deliveryLine(o.delivery_date, o.delivery_note) && (o.status === "novo" || o.status === "aprovado" || o.status === "enviado") && (
                 <p className="deliv">📅 Entrega prevista: <b>{deliveryLine(o.delivery_date, o.delivery_note)}</b></p>
               )}
@@ -106,7 +114,8 @@ export default async function Conta({ searchParams }: { searchParams: Promise<{ 
                   </details>
                 </>
               )}
-            </div>
+              </div>
+            </details>
           ))}
         </div>
       </main>

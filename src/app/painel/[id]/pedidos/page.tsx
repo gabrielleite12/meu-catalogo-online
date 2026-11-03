@@ -2,6 +2,8 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { brl } from "@/lib/utils";
 import ItemPhoto from "@/components/ItemPhoto";
+import MiniPhotos from "@/components/MiniPhotos";
+import OrderSteps from "@/components/OrderSteps";
 import { itemPhotos } from "@/lib/orderImages";
 import { buildStoreReply, cancelLine, deliveryLine, timeAgo, timeline, todayBR, whatsappLink } from "@/lib/orders";
 import { setOrderStatus, returnItems, scheduleDelivery } from "../../actions";
@@ -57,7 +59,10 @@ export default async function Pedidos({ params, searchParams }: {
   return (
     <>
       <h2>Pedidos</h2>
-      <p className="muted">O cliente envia o pedido pelo WhatsApp e ele fica registrado aqui. O estoque é reservado ao pedir. <b>Aprove</b> o pedido para confirmar que vai atender e marque <b>enviado</b> quando sair para entrega; o cliente confirma o recebimento (ou vira <b>entregue</b> sozinho em 7 dias) e então pode avaliar. Cancelar (com motivo) ou devolver itens devolve ao estoque, e o cliente é avisado de quem cancelou e por quê.</p>
+      <details className="howto">
+        <summary className="muted">Como funciona o fluxo do pedido</summary>
+        <p className="muted">O cliente envia o pedido pelo WhatsApp e ele fica registrado aqui, com o estoque reservado. <b>Aprove</b> para confirmar que vai atender e marque <b>enviado</b> quando sair para entrega. O cliente confirma o recebimento (ou vira <b>entregue</b> sozinho em 7 dias) e então pode avaliar. Cancelar (com motivo) ou devolver itens devolve ao estoque, e o cliente é avisado de quem cancelou e por quê.</p>
+      </details>
       {loadError && <p className="err">Não foi possível carregar os pedidos ({loadError.message}). Confira se a migração 010 foi aplicada no Supabase.</p>}
       <NotifyButton variant="card" hint="Receba um aviso no celular a cada novo pedido e quando o cliente confirmar a entrega." />
       {late > 0 && <p className="alert">⚠ {late} {late === 1 ? "entrega atrasada" : "entregas atrasadas"} — confira a data combinada.</p>}
@@ -125,13 +130,19 @@ export default async function Pedidos({ params, searchParams }: {
           const items = o.order_items as Item[];
           const names = new Map(items.map((i) => [i.id, label(i)]));
           return (
-            <div className="card prod ord" key={o.id}>
-              <div className="between">
-                <strong>Pedido #{o.code}</strong>
-                <span className={"status " + o.status}>{LABEL[o.status]}</span>
-              </div>
+            <details className="card prod ord" key={o.id} open={o.status === "novo" || o.status === "enviado" || isToday(o) || isLate(o) || list.length === 1}>
+              <summary className="osum">
+                <MiniPhotos files={items.map((i) => photos.get(i.id))} />
+                <span className="otxt">
+                  <b>#{o.code} · {o.customer_name}</b>
+                  <small className="muted">{items.reduce((a, i) => a + i.qty, 0)} {items.reduce((a, i) => a + i.qty, 0) === 1 ? "item" : "itens"} · {timeAgo(o.created_at)}{isLate(o) ? " · ⚠ atrasada" : isToday(o) ? " · 📅 hoje" : ""}</small>
+                </span>
+                <span className="oright"><span className={"status " + o.status}>{LABEL[o.status]}</span><b>{o.total ? brl(o.total) : ""}</b></span>
+              </summary>
+              <div className="obody">
+              <OrderSteps status={o.status} />
               <p className="muted">
-                {new Date(o.created_at).toLocaleString("pt-BR")} · {timeAgo(o.created_at)}
+                {new Date(o.created_at).toLocaleString("pt-BR")}
                 {o.status === "enviado" && o.shipped_at && <> · enviado {timeAgo(o.shipped_at)}</>}
               </p>
               <p><b>{o.customer_name}</b> · {o.customer_phone}<br /><span className="muted">{o.delivery_type === "retirada" ? "🏬 Retirada na loja" : o.customer_address}</span></p>
@@ -208,7 +219,8 @@ export default async function Pedidos({ params, searchParams }: {
                   </form>
                 </details>
               )}
-            </div>
+              </div>
+            </details>
           );
         })}
       </div>
