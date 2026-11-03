@@ -3,27 +3,36 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { driveAccessToken } from "@/lib/google";
 
 // Entrega a miniatura de uma foto do Drive usando o token do dono da loja.
-// Só serve arquivos vinculados a uma loja publicada, ou do próprio usuário logado (pré-visualização).
+// Serve arquivos de lojas publicadas (foto do produto ou da variação), de quem já pediu na loja, ou do próprio usuário logado (pré-visualização).
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[\w-]{10,80}$/.test(id)) return new Response("bad id", { status: 400 });
   const size = Math.min(Number(new URL(req.url).searchParams.get("s")) || 800, 1600);
 
-  let ownerId: string | null = null;
-  const { data: link } = await supabaseAdmin()
-    .from("product_images")
-    .select("products!inner(stores!inner(owner_id,published))")
-    .eq("drive_file_id", id)
-    .limit(1)
-    .maybeSingle();
-  // @ts-expect-error relação aninhada
-  const store = link?.products?.stores;
-  if (store?.published) ownerId = store.owner_id;
+  const admin = supabaseAdmin();
+  const { data: viewer } = await (await supabaseServer()).auth.getUser();
+  const uid = viewer.user?.id ?? null;
 
-  if (!ownerId) {
-    const { data } = await (await supabaseServer()).auth.getUser();
-    ownerId = data.user?.id ?? null;
+  // Dono da loja onde a foto é usada (foto do produto ou foto de uma variação) e se a loja está publicada.
+  type Store = { id: string; owner_id: string; published: boolean };
+  const [{ data: link }, { data: vlink }] = await Promise.all([
+    admin.from("product_images").select("products!inner(stores!inner(id,owner_id,published))").eq("drive_file_id", id).limit(1).maybeSingle(),
+    admin.from("product_variants").select("products!inner(stores!inner(id,owner_id,published))").eq("image_file_id", id).limit(1).maybeSingle(),
+  ]);
+  // @ts-expect-error relação aninhada
+  const store: Store | undefined = link?.products?.stores ?? vlink?.products?.stores;
+
+  let ownerId: string | null = null;
+  if (store?.published) ownerId = store.owner_id;
+  else if (store && uid) {
+    // loja fora do ar: só o dono e quem já fez pedido nela continuam vendo as fotos
+    if (store.owner_id === uid) ownerId = uid;
+    else {
+      const { count } = await admin.from("orders").select("id", { count: "exact", head: true }).eq("store_id", store.id).eq("customer_id", uid);
+      if (count) ownerId = store.owner_id;
+    }
   }
+  if (!ownerId) ownerId = uid; // pré-visualização: arquivo ainda não vinculado, usa o Drive de quem está logado
   if (!ownerId) return new Response("not found", { status: 404 });
 
   const token = await driveAccessToken(ownerId);
