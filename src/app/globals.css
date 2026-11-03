@@ -774,3 +774,30 @@ html{scroll-behavior:smooth}
     font-size: 13px;
   }
 }
+
+/* pedidos que abrem e fecham, com resumo e andamento */
+details.ord{padding:0}
+.osum{list-style:none;display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}
+.osum::-webkit-details-marker{display:none}
+.osum::after{content:"▾";color:var(--muted);transition:transform .15s;margin-left:2px}
+details.ord[open]>.osum::after{transform:rotate(180deg)}
+details.ord[open]>.osum{border-bottom:1px solid var(--line)}
+.minis{display:flex;flex:none}
+.mini{width:44px;height:44px;border-radius:10px;overflow:hidden;background:var(--soft);border:2px solid var(--bg,#fff);margin-left:-12px;display:grid;place-items:center;font-size:18px;opacity:1}
+.mini:first-child{margin-left:0}.mini img{width:100%;height:100%;object-fit:cover}.mini.more{font-size:12px;font-weight:700;color:var(--muted)}
+.otxt{display:flex;flex-direction:column;min-width:0;flex:1}.otxt b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oright{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}.oright b{font-size:14px}
+.obody{padding:12px 14px 14px}
+.steps{list-style:none;display:flex;gap:4px;margin:2px 0 14px;padding:0}
+.steps li{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted);position:relative;text-align:center}
+.steps li::before{content:"";position:absolute;top:11px;left:-50%;width:100%;height:2px;background:var(--line);z-index:0}
+.steps li:first-child::before{display:none}
+.steps li i{position:relative;z-index:1;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:700;background:var(--soft);border:2px solid var(--line)}
+.steps li.done i,.steps li.now i{background:var(--brand);border-color:var(--brand);color:#fff}.steps li.done::before,.steps li.now::before{background:var(--brand)}
+.steps li.now span{color:var(--ink);font-weight:700}
+.itrow .pthumb{width:72px;height:72px}.itrow{gap:12px}
+@media(max-width:520px){.osum{gap:10px;padding:10px 12px}.mini{width:38px;height:38px}.obody{padding:10px 12px 12px}}
+.howto{margin:6px 0 12px}.howto summary{cursor:pointer;font-size:14px}.howto p{margin:8px 0 0}
+@media(max-width:640px){.stats{grid-template-columns:1fr 1fr!important}}
+@media(min-width:641px){.stats{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:520px){.otxt b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}}
