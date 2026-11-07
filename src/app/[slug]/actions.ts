@@ -6,7 +6,13 @@ import { buildOrderMessage, orderErrorMessage, whatsappLink, type PlacedOrder } 
 
 type Result = { error?: string; link?: string };
 
-export async function placeOrder(input: { slug: string; items: { id: string; variantId?: string; qty: number }[]; notes?: string; pickup?: boolean }): Promise<Result> {
+export async function placeOrder(input: {
+  slug: string;
+  items: { id: string; variantId?: string; qty: number }[];
+  notes?: string;
+  pickup?: boolean;
+  sellerId?: string;
+}): Promise<Result> {
   const supabase = await supabaseServer();
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return { error: "Entre na sua conta para fazer o pedido." };
@@ -21,6 +27,7 @@ export async function placeOrder(input: { slug: string; items: { id: string; var
     p_items: input.items.filter((i) => i.qty > 0).map((i) => ({ id: i.id, variantId: i.variantId ?? "", qty: Math.floor(i.qty) })),
     p_notes: input.notes ?? null,
     p_pickup: !!input.pickup,
+    p_seller: input.sellerId || null,
   });
   if (error || !data) return { error: orderErrorMessage(error?.message ?? "") };
 

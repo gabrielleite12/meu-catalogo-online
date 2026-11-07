@@ -11,12 +11,13 @@ export async function loadStorefront(slug: string) {
     .from("products").select("*, product_images(id,drive_file_id,position), product_variants(*)")
     .eq("store_id", store.id).eq("active", true).order("position").order("created_at");
   const ids = (products ?? []).map((p) => p.id);
-  const [{ data: sStat }, { data: pStats }, { data: sRev }, { data: pRev }, { data: rules }] = await Promise.all([
+  const [{ data: sStat }, { data: pStats }, { data: sRev }, { data: pRev }, { data: rules }, { data: sellers }] = await Promise.all([
     supabase.from("store_rating_stats").select("*").eq("store_id", store.id).maybeSingle(),
     ids.length ? supabase.from("product_rating_stats").select("*").in("product_id", ids) : { data: [] },
     supabase.from("store_reviews").select("id,reviewer_name,rating,comment,created_at").eq("store_id", store.id).order("created_at", { ascending: false }).limit(30),
     ids.length ? supabase.from("product_reviews").select("id,product_id,reviewer_name,rating,comment,created_at").in("product_id", ids).order("created_at", { ascending: false }).limit(200) : { data: [] },
     supabase.from("shipping_rules").select("*").eq("store_id", store.id).order("position"),
+    supabase.from("sellers").select("id,name,code,phone").eq("store_id", store.id).eq("active", true).order("position").order("name"),
   ]);
   const { data: u } = await supabase.auth.getUser();
   const { data: profile } = u.user ? await supabase.from("profiles").select("id,city,state").eq("id", u.user.id).maybeSingle() : { data: null };
@@ -30,5 +31,6 @@ export async function loadStorefront(slug: string) {
     storeReviews: (sRev ?? []) as Review[], productRatings, productReviews,
     viewer: { loggedIn: !!u.user, hasProfile: !!profile, city: profile?.city ?? null, state: profile?.state ?? null },
     shipping: { rules: (rules ?? []) as ShippingRule[], addToTotal: store.shipping_add_to_total ?? true, pickup: !!store.pickup_enabled },
+    sellers: (sellers ?? []) as { id: string; name: string; code: string | null; phone: string | null }[],
   };
 }

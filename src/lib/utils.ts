@@ -31,3 +31,7 @@ export const safeNext = (n: string | null | undefined, fallback = "/") =>
 
 export type Rating = { avg_rating: number; total: number };
 export type Review = { id: string; reviewer_name: string; rating: number; comment: string | null; created_at: string };
+export type Seller = {
+  id: string; store_id: string; name: string; code: string | null;
+  phone: string | null; email: string | null; active: boolean; position: number; created_at: string;
+};

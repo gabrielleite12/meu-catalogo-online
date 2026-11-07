@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import StoreCart from "@/components/StoreCart";
@@ -10,6 +10,9 @@ type Params = { params: Promise<{ slug: string; id: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug, id } = await params;
+  if (slug === "rua-dorico-varella-sao-joao-ponto-de-ref") {
+    return { title: "Produto — TEXUGO CALÇADOS" };
+  }
   const r = await loadStorefront(slug);
   const p = r?.products.find((x) => x.id === id);
   return p ? { title: `${p.name} — ${r!.store.name}`, description: `${p.name} · ${priceLabel(p)}${p.description ? " · " + p.description : ""}`.slice(0, 160) } : {};
@@ -17,6 +20,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function ProdutoPage({ params }: Params) {
   const { slug, id } = await params;
+  if (slug === "rua-dorico-varella-sao-joao-ponto-de-ref") {
+    redirect(`/texugo-calcados/p/${id}`);
+  }
   const r = await loadStorefront(slug);
   if (!r) notFound();
   const product = r.products.find((x) => x.id === id);
@@ -26,7 +32,7 @@ export default async function ProdutoPage({ params }: Params) {
   return (
     <>
       <SiteHeader />
-      <StoreCart store={{ slug: store.slug, name: store.name, whatsapp: store.whatsapp }} products={r.products} viewer={r.viewer} shipping={r.shipping} floatingBar={false}>
+      <StoreCart store={{ slug: store.slug, name: store.name, whatsapp: store.whatsapp }} products={r.products} viewer={r.viewer} shipping={r.shipping} sellers={r.sellers} floatingBar={false}>
         <ProductView
           store={{ slug: store.slug, name: store.name, logo_url: store.logo_url, payment_methods: store.payment_methods, delivery_methods: store.delivery_methods }}
           product={product} rating={r.productRatings[id] ?? null} reviews={r.productReviews[id] ?? []} related={related}

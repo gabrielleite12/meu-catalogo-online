@@ -8,6 +8,7 @@ export type PlacedOrder = {
   subtotal?: number; shipping_fee?: number | null; shipping_label?: string | null; shipping_added?: boolean; delivery_type?: "entrega" | "retirada";
   customer_name: string; customer_phone: string; address: string; whatsapp: string | null;
   store_name: string; notes: string | null;
+  seller_name?: string | null;
 };
 
 /** Mensagem pronta do WhatsApp (formatação *negrito* do próprio WhatsApp). */
@@ -27,6 +28,7 @@ export function buildOrderMessage(o: PlacedOrder): string {
     ...(o.total > 0 ? [`💰 *Total: ${brlFmt(o.total)}*${unpriced ? " (+ itens sob consulta)" : ""}`, ""] : []),
     `👤 *Cliente:* ${o.customer_name}`,
     `📞 *Telefone:* ${o.customer_phone}`,
+    ...(o.seller_name ? [`💼 *Vendedor:* ${o.seller_name}`] : []),
     o.delivery_type === "retirada" ? "🏬 *Retirada na loja*" : `📍 *Endereço:* ${o.address}`,
     ...(o.notes ? [`📝 *Obs.:* ${o.notes}`] : []),
     "",

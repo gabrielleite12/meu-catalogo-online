@@ -6,6 +6,7 @@ import { avail, key, priceOf, vars } from "@/lib/catalog";
 import { placeOrder } from "@/app/[slug]/actions";
 import { quoteShipping, type ShippingRule } from "@/lib/shipping";
 
+type SellerOption = { id: string; name: string; code?: string | null };
 type StoreInfo = { slug: string; name: string; whatsapp: string | null };
 type Viewer = { loggedIn: boolean; hasProfile: boolean; city?: string | null; state?: string | null };
 type Shipping = { rules: ShippingRule[]; addToTotal: boolean; pickup: boolean };
@@ -24,14 +25,15 @@ export const useStoreCart = () => {
 };
 
 /** Carrinho da loja: guarda no navegador, compartilhado entre a vitrine e a página do produto. */
-export default function StoreCart({ store, products, viewer, shipping, floatingBar = true, children }: {
-  store: StoreInfo; products: Product[]; viewer: Viewer; shipping: Shipping; floatingBar?: boolean; children: React.ReactNode;
+export default function StoreCart({ store, products, viewer, shipping, sellers = [], floatingBar = true, children }: {
+  store: StoreInfo; products: Product[]; viewer: Viewer; shipping: Shipping; sellers?: SellerOption[]; floatingBar?: boolean; children: React.ReactNode;
 }) {
   const storageKey = `cart2:${store.slug}`;
   const [cart, setCart] = useState<Record<string, number>>({});
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [obs, setObs] = useState("");
+  const [sellerId, setSellerId] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [pickup, setPickup] = useState(false);
@@ -56,6 +58,32 @@ export default function StoreCart({ store, products, viewer, shipping, floatingB
   const count = lines.reduce((a, l) => a + l.n, 0);
   const total = lines.reduce((a, l) => a + (priceOf(l.p, l.v) ?? 0) * l.n, 0);
 
+  // Escuta comando global de abertura do carrinho (ex: pelo AppBottomNav)
+  useEffect(() => {
+    const handleOpen = () => setOpen(true);
+    window.addEventListener("vz-open-cart", handleOpen);
+    return () => window.removeEventListener("vz-open-cart", handleOpen);
+  }, []);
+
+  // Notifica menu inferior e outros componentes sobre a quantidade de itens
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("vz-cart-count", { detail: { count, slug: store.slug } })
+    );
+  }, [count, store.slug]);
+
+  // Marca no body se a barra flutuante está ativa (para elevar o botão do agente de IA discretamente)
+  useEffect(() => {
+    if (floatingBar && count > 0) {
+      document.body.classList.add("has-cartbar");
+    } else {
+      document.body.classList.remove("has-cartbar");
+    }
+    return () => {
+      document.body.classList.remove("has-cartbar");
+    };
+  }, [count, floatingBar]);
+
   // frete conforme a cidade/estado do cadastro do cliente (o valor definitivo é calculado no servidor ao enviar)
   const quote = useMemo(() => quoteShipping(shipping.rules, { city: viewer.city, state: viewer.state }, total), [shipping.rules, viewer.city, viewer.state, total]);
   const usePickup = pickup && shipping.pickup;
@@ -66,7 +94,13 @@ export default function StoreCart({ store, products, viewer, shipping, floatingB
   async function send() {
     setErr(""); setSending(true);
     const win = window.open("", "_blank");
-    const r = await placeOrder({ slug: store.slug, items: lines.map((l) => ({ id: l.p.id, variantId: l.v?.id, qty: l.n })), notes: obs, pickup: usePickup });
+    const r = await placeOrder({
+      slug: store.slug,
+      items: lines.map((l) => ({ id: l.p.id, variantId: l.v?.id, qty: l.n })),
+      notes: obs,
+      pickup: usePickup,
+      sellerId: sellerId || undefined,
+    });
     setSending(false);
     if (!r.link) { win?.close(); return setErr(r.error ?? "Erro ao enviar."); }
     setCart({}); setOpen(false);
@@ -119,6 +153,21 @@ export default function StoreCart({ store, products, viewer, shipping, floatingB
               {blocked && <p className="err">A loja não entrega {viewer.city ? `em ${viewer.city}` : "neste endereço"}.{shipping.pickup ? " Escolha retirar na loja." : " Fale com ela pelo WhatsApp."}</p>}
             </div>
             <div className="between total"><span>Total</span><b>{finalTotal > 0 ? brl(finalTotal) : "—"}</b></div>
+            {sellers.length > 0 && (
+              <div className="form">
+                <label>
+                  Quem te atendeu? (Vendedor)
+                  <select value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
+                    <option value="">Nenhum / Compra direta pelo site</option>
+                    {sellers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        👤 {s.name}{s.code ? ` (${s.code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
             <div className="form">
               <label>Observações<textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Forma de pagamento, retirada, horário…" /></label>
             </div>

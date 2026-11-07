@@ -330,3 +330,43 @@ export async function renameLabel(fd: FormData) {
   refresh();
   back(store, "categorias", "ok", to ? `"${from}" agora é "${to}".` : `"${from}" removido dos produtos.`);
 }
+
+// ---------- Vendedores ----------
+export async function saveSeller(fd: FormData) {
+  const { supabase } = await ctx();
+  const store = String(fd.get("store"));
+  const id = String(fd.get("id") ?? "");
+  const name = String(fd.get("name") ?? "").trim();
+  const code = String(fd.get("code") ?? "").trim() || null;
+  const phone = String(fd.get("phone") ?? "").replace(/\D/g, "") || null;
+  const email = String(fd.get("email") ?? "").trim() || null;
+  if (!name) back(store, "vendedores", "erro", "Informe o nome do vendedor.");
+  const row = { name, code, phone, email };
+  const { error } = id
+    ? await supabase.from("sellers").update(row).eq("id", id).eq("store_id", store)
+    : await supabase.from("sellers").insert({ ...row, store_id: store, active: true, position: Math.floor(Date.now() / 1000) });
+  refresh();
+  if (error) back(store, "vendedores", "erro", "Erro ao salvar vendedor: " + error.message);
+  back(store, "vendedores", "ok", id ? "Vendedor atualizado com sucesso." : "Vendedor cadastrado com sucesso.");
+}
+
+export async function toggleSeller(fd: FormData) {
+  const { supabase } = await ctx();
+  const store = String(fd.get("store"));
+  const id = String(fd.get("id") ?? "");
+  const active = fd.get("active") === "true";
+  const { error } = await supabase.from("sellers").update({ active: !active }).eq("id", id).eq("store_id", store);
+  refresh();
+  if (error) back(store, "vendedores", "erro", "Erro ao alterar status: " + error.message);
+  back(store, "vendedores", "ok", !active ? "Vendedor ativado." : "Vendedor desativado.");
+}
+
+export async function deleteSeller(fd: FormData) {
+  const { supabase } = await ctx();
+  const store = String(fd.get("store"));
+  const id = String(fd.get("id") ?? "");
+  const { error } = await supabase.from("sellers").delete().eq("id", id).eq("store_id", store);
+  refresh();
+  if (error) back(store, "vendedores", "erro", "Erro ao excluir vendedor: " + error.message);
+  back(store, "vendedores", "ok", "Vendedor excluído.");
+}

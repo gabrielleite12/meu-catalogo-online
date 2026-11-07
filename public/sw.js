@@ -1,15 +1,25 @@
-// Service worker da Vitrine Zap: abre mesmo sem internet (tela offline), guarda arquivos estáticos e recebe avisos push.
-const VERSION = "vitrinezap-v1";
+// Service worker da Vitrine Zap: navegação offline, controle de versão e avisos push.
+const VERSION = "vitrinezap-v1.3";
 const SHELL = ["/offline.html", "/icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
+});
+
+self.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", (e) => {
@@ -18,19 +28,32 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // arquivos estáticos versionados: cache primeiro
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")) {
+  // Em localhost / desenvolvimento, nunca intercepta para não quebrar o HMR do Webpack
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.pathname.startsWith("/_next/")) {
+    return;
+  }
+
+  // Apenas ícones estáticos no cache
+  if (url.pathname.startsWith("/icons/")) {
     e.respondWith(
       caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-        if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(req, copy));
+        }
         return res;
-      })),
+      }))
     );
     return;
   }
-  // páginas: sempre da rede (têm dados de login e de pedidos); sem internet, mostra a tela offline
+
+  // Páginas HTML de navegação: sempre da rede para garantir os dados mais atualizados do SSR;
+  // se o usuário estiver completamente sem conexão, exibe a página offline estilizada.
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).catch(() => caches.match("/offline.html")));
+    e.respondWith(
+      fetch(req).catch(() => caches.match("/offline.html"))
+    );
+    return;
   }
 });
 
@@ -45,7 +68,7 @@ self.addEventListener("push", (e) => {
       tag: data.tag || undefined,
       renotify: !!data.tag,
       data: { url: data.url || "/" },
-    }),
+    })
   );
 });
 
@@ -60,6 +83,6 @@ self.addEventListener("notificationclick", (e) => {
         }
       }
       return self.clients.openWindow(target);
-    }),
+    })
   );
 });

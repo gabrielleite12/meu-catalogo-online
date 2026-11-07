@@ -1,10 +1,11 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { brl, imgUrl, type Product, type Rating } from "@/lib/utils";
 import { Stars } from "@/components/Stars";
 import { avail, norm, parseVariants, priceLabel, priceOf, soldOut, vars } from "@/lib/catalog";
 import { useStoreCart } from "@/components/StoreCart";
+import VoiceSearchButton from "@/components/VoiceSearchButton";
 
 function SizesAndColors({ p }: { p: Product }) {
   const info = parseVariants(p);
@@ -35,6 +36,17 @@ export default function Catalog({ slug, products, ratings }: { slug: string; pro
   const [selectedSize, setSelectedSize] = useState("");
   const [sort, setSort] = useState<"" | "menor" | "maior" | "nome">("");
   const [onlyAvail, setOnlyAvail] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  // Bloqueia a rolagem da página e fecha com ESC enquanto o painel de filtros está aberto
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [open]);
 
   const uniq = (xs: (string | null)[]) => [...new Set(xs.filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const categories = useMemo(() => uniq(products.map((p) => p.category)), [products]);
@@ -155,32 +167,108 @@ export default function Catalog({ slug, products, ratings }: { slug: string; pro
   };
 
   const hasActiveFilters = Boolean(q || cat || type || tag || selectedSize || sort || onlyAvail);
+  const activeCount = [cat, type, tag, selectedSize, sort, onlyAvail].filter(Boolean).length;
 
   return (
     <div className="catalog-wrapper">
       {/* Caixa de Filtros Principal */}
       <section className="filter-card" aria-label="Filtros do catálogo">
-        {/* Barra de busca estilizada */}
-        <div className="search-box">
-          <span className="search-icon" aria-hidden="true">
+        {/* Barra de busca estilizada + Gatilho de Filtros Mobile */}
+        <div className="search-bar-row">
+          <div className="search-box">
+            <span className="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              className="search-input"
+              placeholder="Buscar produto, tamanho (38, M), cor…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <div className="search-actions-group">
+              {q && (
+                <button className="search-clear" onClick={() => setQ("")} aria-label="Limpar busca" type="button">
+                  ✕
+                </button>
+              )}
+              <VoiceSearchButton
+                onTranscript={(text) => setQ(text)}
+                className="catalog-voice-btn"
+                title="Falar para pesquisar produto"
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className={`mobile-filter-btn ${activeCount > 0 ? "active" : ""}`}
+            onClick={() => setOpen(true)}
+            aria-label={`Abrir filtros${activeCount ? ` (${activeCount} ativos)` : ""}`}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="7" y1="12" x2="17" y2="12" />
+              <line x1="10" y1="18" x2="14" y2="18" />
             </svg>
-          </span>
-          <input
-            className="search-input"
-            placeholder="Buscar por produto, tamanho (ex: 38, M), cor…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          {q && (
-            <button className="search-clear" onClick={() => setQ("")} aria-label="Limpar busca" type="button">
-              ✕
-            </button>
-          )}
+            <span className="mf-text">Filtros</span>
+            {activeCount > 0 && <b className="mf-count">{activeCount}</b>}
+          </button>
         </div>
 
+        {/* Barra rápida horizontal para Mobile (Categorias + Tamanhos visíveis direto na tela) */}
+        {(categories.length > 0 || availableSizes.length > 0) && (
+          <div className="mobile-quick-filters">
+            {categories.length > 0 && (
+              <div className="mq-row">
+                <button
+                  type="button"
+                  className={`mq-pill ${!cat ? "active" : ""}`}
+                  onClick={() => pickCat(cat)}
+                >
+                  Todas <span>{products.length}</span>
+                </button>
+                {categories.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`mq-pill ${cat === c ? "active" : ""}`}
+                    onClick={() => pickCat(c)}
+                  >
+                    {c} <span>{countOfCat(c)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {availableSizes.length > 0 && (
+              <div className="mq-row mq-sizes">
+                <span className="mq-size-label">{sizeLabel}:</span>
+                {availableSizes.map((s) => {
+                  const isSelected = selectedSize === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`mq-size-chip ${isSelected ? "selected" : ""}`}
+                      onClick={() => setSelectedSize(isSelected ? "" : s)}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={"filter-panel" + (open ? " open" : "")} role="dialog" aria-label="Filtros" aria-hidden={undefined}>
+        <div className="fp-head">
+          <b>Filtros</b>
+          <button type="button" className="fp-close" onClick={() => setOpen(false)} aria-label="Fechar filtros">✕</button>
+        </div>
+        <div className="fp-body">
         {/* Categorias em pills elegantes */}
         {categories.length > 0 && (
           <div className="filter-group">
@@ -362,7 +450,26 @@ export default function Catalog({ slug, products, ratings }: { slug: string; pro
             )}
           </div>
         )}
+        </div>
+        <div className="fp-foot">
+          <button type="button" className="btn" onClick={clearAll} disabled={!hasActiveFilters}>Limpar</button>
+          <button type="button" className="btn primary" onClick={() => setOpen(false)}>
+            Ver {shown.length} {shown.length === 1 ? "produto" : "produtos"}
+          </button>
+        </div>
+        </div>
+        {open && <div className="fp-backdrop" onClick={() => setOpen(false)} />}
       </section>
+
+      {/* Botão circular flutuante (celular): acompanha a rolagem e abre os filtros */}
+      {!open && (
+        <button type="button" className="filter-fab" onClick={() => setOpen(true)} aria-label={`Abrir filtros${activeCount ? ` (${activeCount} ativos)` : ""}`}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="4" y1="6" x2="20" y2="6" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
+          </svg>
+          {activeCount > 0 && <span className="fab-badge">{activeCount}</span>}
+        </button>
+      )}
 
       {/* Mensagem quando não encontra produtos */}
       {!shown.length && (

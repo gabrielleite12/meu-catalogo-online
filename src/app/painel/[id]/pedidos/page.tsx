@@ -18,22 +18,24 @@ const label = (i: { name: string; variant_name?: string | null }) => `${i.name}$
 const SELECT = "*, order_items(id,product_id,variant_id,name,variant_name,price,qty,qty_returned), order_returns(id,order_item_id,qty,restocked,reason)";
 
 export default async function Pedidos({ params, searchParams }: {
-  params: Promise<{ id: string }>; searchParams: Promise<{ s?: string; q?: string; devolver?: string; erro?: string; ok?: string }>;
+  params: Promise<{ id: string }>; searchParams: Promise<{ s?: string; q?: string; vendedor?: string; devolver?: string; erro?: string; ok?: string }>;
 }) {
   const { id } = await params;
-  const { s, q, devolver, erro, ok } = await searchParams;
+  const { s, q, vendedor, devolver, erro, ok } = await searchParams;
   const supabase = await supabaseServer();
   await supabase.rpc("auto_deliver_orders"); // enviado e sem confirmação há 7 dias vira entregue
   const code = Number(devolver);
-  const [{ data, error: loadError }, { data: store }, { data: ret }] = await Promise.all([
+  const [{ data, error: loadError }, { data: store }, { data: sellersData }, { data: ret }] = await Promise.all([
     supabase.from("orders").select(SELECT).eq("store_id", id).order("created_at", { ascending: false }).limit(200),
     supabase.from("stores").select("name").eq("id", id).maybeSingle(),
+    supabase.from("sellers").select("id,name,code").eq("store_id", id).order("name"),
     Number.isInteger(code) && code > 0
       ? supabase.from("orders").select(SELECT).eq("store_id", id).eq("code", code).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   const all = data ?? [];
   const photos = await itemPhotos(supabase, all.flatMap((o) => o.order_items as Item[]));
+  const sellersList = (sellersData ?? []) as { id: string; name: string; code: string | null }[];
   const today = todayBR();
   const open = (o: { status: string }) => o.status === "novo" || o.status === "aprovado" || o.status === "enviado";
   const isToday = (o: { status: string; delivery_date: string | null }) => open(o) && o.delivery_date === today;
@@ -45,13 +47,14 @@ export default async function Pedidos({ params, searchParams }: {
   const term = (q ?? "").trim().toLowerCase();
   const list = all.filter((o) =>
     match(o, filter) &&
-    (!term || `#${o.code} ${o.customer_name} ${o.customer_phone}`.toLowerCase().includes(term)));
+    (!vendedor || (vendedor === "sem_vendedor" ? !o.seller_id : o.seller_id === vendedor)) &&
+    (!term || `#${o.code} ${o.customer_name} ${o.customer_phone} ${o.seller_name ?? ""}`.toLowerCase().includes(term)));
   const net = (o: { order_items: Item[] }) => o.order_items.reduce((a, i) => a + (i.price ?? 0) * (i.qty - i.qty_returned), 0);
   const openTotal = all.filter((o) => o.status === "novo").reduce((a, o) => a + (o.total ?? 0), 0);
   const sold = all.filter((o) => o.status === "finalizado").reduce((a, o) => a + net(o), 0);
   const transit = all.filter((o) => o.status === "enviado");
   const units = transit.reduce((a, o) => a + o.order_items.reduce((b: number, i: Item) => b + i.qty - i.qty_returned, 0), 0);
-  const href = (st: string) => `?s=${st}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  const href = (st: string) => `?s=${st}${vendedor ? `&vendedor=${encodeURIComponent(vendedor)}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
   const here = `/painel/${id}/pedidos`;
 
   const returnable = ret && (ret.status === "enviado" || ret.status === "finalizado");
@@ -117,8 +120,45 @@ export default async function Pedidos({ params, searchParams }: {
           <Link key={k} href={href(k)} className={"fchip" + (filter === k ? " on" : "")}>{l}<b>{count(k)}</b></Link>
         ))}
       </div>
+
+      {/* Barra de Filtro de Vendedores */}
+      {sellersList.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", margin: "10px 0 14px", padding: "8px 12px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+          <span className="muted" style={{ fontSize: "13px", fontWeight: "600" }}>👤 Vendedor:</span>
+          <Link
+            href={`?s=${filter}${term ? `&q=${encodeURIComponent(term)}` : ""}`}
+            className={`btn sm ${!vendedor ? "primary" : "ghost"}`}
+            style={{ padding: "3px 10px", fontSize: "12px", borderRadius: "20px" }}
+          >
+            Todos ({all.length})
+          </Link>
+          {sellersList.map((s) => {
+            const sCount = all.filter((o) => o.seller_id === s.id).length;
+            const on = vendedor === s.id;
+            return (
+              <Link
+                key={s.id}
+                href={`?s=${filter}&vendedor=${s.id}${term ? `&q=${encodeURIComponent(term)}` : ""}`}
+                className={`btn sm ${on ? "primary" : "ghost"}`}
+                style={{ padding: "3px 10px", fontSize: "12px", borderRadius: "20px" }}
+              >
+                {s.name} ({sCount})
+              </Link>
+            );
+          })}
+          <Link
+            href={`?s=${filter}&vendedor=sem_vendedor${term ? `&q=${encodeURIComponent(term)}` : ""}`}
+            className={`btn sm ${vendedor === "sem_vendedor" ? "primary" : "ghost"}`}
+            style={{ padding: "3px 10px", fontSize: "12px", borderRadius: "20px" }}
+          >
+            Sem vendedor ({all.filter((o) => !o.seller_id).length})
+          </Link>
+        </div>
+      )}
+
       <form className="toolbar nowrap" action="">
         <input type="hidden" name="s" value={filter} />
+        {vendedor && <input type="hidden" name="vendedor" value={vendedor} />}
         <input type="text" name="q" defaultValue={q ?? ""} placeholder="Buscar por nº do pedido, nome ou telefone" />
         <button className="btn sm">Buscar</button>
         {term && <Link className="btn ghost sm" href={href(filter)}>Limpar</Link>}
@@ -146,6 +186,19 @@ export default async function Pedidos({ params, searchParams }: {
                 {o.status === "enviado" && o.shipped_at && <> · enviado {timeAgo(o.shipped_at)}</>}
               </p>
               <p><b>{o.customer_name}</b> · {o.customer_phone}<br /><span className="muted">{o.delivery_type === "retirada" ? "🏬 Retirada na loja" : o.customer_address}</span></p>
+              {o.seller_name ? (
+                <p style={{ margin: "4px 0" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "rgba(22, 128, 60, 0.12)", color: "var(--brand, #16803c)", padding: "3px 8px", borderRadius: "6px", fontSize: "12.5px", fontWeight: 600 }}>
+                    👤 Atendido por: <b>{o.seller_name}</b>
+                  </span>
+                </p>
+              ) : (
+                <p style={{ margin: "4px 0" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#f1f5f9", color: "#64748b", padding: "2px 7px", borderRadius: "6px", fontSize: "11.5px" }}>
+                    🛒 Venda direta pelo site
+                  </span>
+                </p>
+              )}
               <p className="hist" aria-label="Histórico">{timeline(o).map((t) => <span key={t.label}>{t.label} {t.at}</span>)}</p>
               {o.status === "cancelado" && (
                 <p className="cancelinfo">✕ {cancelLine(o)}{o.stock_reserved && <><br />↩ Os itens voltaram ao estoque.</>}</p>

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { imgUrl, type Store } from "@/lib/utils";
 import { Stars } from "@/components/Stars";
+import HomeSearch from "@/components/HomeSearch";
+import GlobalChatbot from "@/components/GlobalChatbot";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q = "" } = await searchParams;
@@ -30,10 +32,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       <main className="wrap">
         <section className="hero">
           <h1>Encontre lojas e produtos</h1>
-          <form className="search" action="/">
-            <input name="q" defaultValue={q} placeholder="Busque por loja, tipo de produto ou cidade…" autoFocus={!!q} />
-            <button className="btn primary">Buscar</button>
-          </form>
+          <HomeSearch initialQuery={q} />
         </section>
         {!stores.length && <p className="muted center-text">{q ? "Nenhuma loja encontrada." : "Ainda não há catálogos publicados."}</p>}
         <div className="grid stores">
@@ -48,6 +47,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
             </Link>
           ))}
         </div>
+        <GlobalChatbot />
       </main>
     </>
   );

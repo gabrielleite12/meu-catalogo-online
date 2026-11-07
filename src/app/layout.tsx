@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "./globals.css";
 import PwaRegister from "@/components/PwaRegister";
+import AppBottomNav from "@/components/AppBottomNav";
 
 export const metadata: Metadata = {
   title: "Vitrine Zap — catálogos online com suas fotos do Drive",
@@ -14,9 +15,18 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#16803c" };
 
 export default function Root({ children }: { children: React.ReactNode }) {
-  return <html lang="pt-BR"><body>
-      {children}
-      <PwaRegister />
-      <footer className="foot"><Link href="/ajuda">Como funciona</Link><Link href="/privacidade">Privacidade</Link><Link href="/termos">Termos</Link></footer>
-    </body></html>;
+  return (
+    <html lang="pt-BR">
+      <body>
+        {children}
+        <PwaRegister />
+        <AppBottomNav />
+        <footer className="foot">
+          <Link href="/ajuda">Como funciona</Link>
+          <Link href="/privacidade">Privacidade</Link>
+          <Link href="/termos">Termos</Link>
+        </footer>
+      </body>
+    </html>
+  );
 }

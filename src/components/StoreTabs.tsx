@@ -12,6 +12,7 @@ export default function StoreTabs({ id, pending }: { id: string; pending: number
     { href: `${base}/categorias`, label: "Categorias" },
     { href: `${base}/importar`, label: "Importar" },
     { href: `${base}/fretes`, label: "Fretes" },
+    { href: `${base}/vendedores`, label: "Vendedores" },
     { href: `${base}/pedidos`, label: "Pedidos", badge: pending },
   ];
   return (
